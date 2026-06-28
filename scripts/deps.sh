@@ -217,7 +217,11 @@ start_bot_in_screen() {
         fi
         screen -S "$screen_name" -p 0 -X stuff "${start_cmd}$(printf \\r)"
         
-        echo "Screen session '$screen_name' started and command sent."
+        # Detach the screen session
+        screen -S "$screen_name" -p 0 -X detach 2>/dev/null || true
+        
+        echo "Screen session '$screen_name' started and running in detached mode."
+        echo "You can attach to it using: screen -r $screen_name"
     else
         echo "No start command entered. Screen session '$screen_name' is idle."
     fi
