@@ -7,18 +7,33 @@ ENV_FILE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/.env"
 save_env() {
     local key="$1"
     local value="$2"
+    local tmp_file="${ENV_FILE}.tmp"
+    local found=0
 
-    if [ -f "$ENV_FILE" ] && grep -q "^${key}=" "$ENV_FILE"; then
-        sed -i "s|^${key}=.*|${key}=${value}|" "$ENV_FILE"
-    else
-        echo "${key}=${value}" >> "$ENV_FILE"
+    touch "$ENV_FILE"
+    > "$tmp_file"
+
+    while IFS= read -r line || [ -n "$line" ]; do
+        if [[ "$line" =~ ^${key}= ]]; then
+            echo "${key}=${value}" >> "$tmp_file"
+            found=1
+        else
+            echo "$line" >> "$tmp_file"
+        fi
+    done < "$ENV_FILE"
+
+    if [ "$found" -eq 0 ]; then
+        echo "${key}=${value}" >> "$tmp_file"
     fi
+
+    mv "$tmp_file" "$ENV_FILE"
 }
 
 load_env() {
     if [ -f "$ENV_FILE" ]; then
-        # Load variables while avoiding environment leaks
-        eval "$(grep -v '^#' "$ENV_FILE" | xargs -d '\n' -I {} echo "export {}" 2>/dev/null || true)"
+        set -a
+        source "$ENV_FILE"
+        set +a
     fi
 }
 
