@@ -29,16 +29,16 @@ fetch_token_from_mongo() {
         const db = db.getSiblingDB('deploy');
         const doc = db.secrets.findOne({_id: 'github_token'});
         doc ? doc.value : '';
-    " 2>/dev/null)
+    " 2>/dev/null || true)
 
-    echo "$token"
+    echo "$token" | tr -d '\r\n '
 }
 
 get_github_token() {
     load_env
 
     if [ -n "$GITHUB_TOKEN" ]; then
-        echo "$GITHUB_TOKEN"
+        echo "$GITHUB_TOKEN" | tr -d '\r\n '
         return
     fi
 
@@ -48,12 +48,12 @@ get_github_token() {
     fi
 
     if [ -n "$token" ]; then
-        echo "$token"
+        echo "$token" | tr -d '\r\n '
         return
     fi
 
     read -rp "Enter GitHub token: " token
-    echo "$token"
+    echo "$token" | tr -d '\r\n '
 }
 
 clone_repo() {
@@ -84,15 +84,29 @@ interactive_mode() {
     fi
 
     echo "Fetching repos from GitHub..."
-    local repos
-    repos=$(curl -s -H "Authorization: token $token" \
+    local response
+    response=$(curl -s -H "Authorization: Bearer $token" \
+        -H "User-Agent: Easy-Deploy" \
         -H "Accept: application/vnd.github.v3+json" \
-        "https://api.github.com/user/repos?per_page=100" \
-        | grep -o '"full_name":"[^"]*"' \
-        | cut -d'"' -f4)
+        "https://api.github.com/user/repos?per_page=100&affiliation=owner,collaborator,organization_member&sort=updated")
+
+    local repos=""
+    if command -v jq &>/dev/null; then
+        repos=$(echo "$response" | jq -r '.[].full_name' 2>/dev/null || true)
+    fi
 
     if [ -z "$repos" ]; then
-        echo "No repos found or invalid token."
+        repos=$(echo "$response" | grep -o '"full_name":"[^"]*"' | cut -d'"' -f4 || true)
+    fi
+
+    if [ -z "$repos" ]; then
+        local msg
+        msg=$(echo "$response" | grep -o '"message":"[^"]*"' | cut -d'"' -f4 || true)
+        if [ -n "$msg" ]; then
+            echo "GitHub API Error: $msg"
+        else
+            echo "No repos found or invalid token."
+        fi
         return 1
     fi
 
