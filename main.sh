@@ -2,12 +2,6 @@
 
 set -e
 
-# Auto-update scripts on startup
-bash scripts/self-update.sh
-if [ $? -eq 1 ]; then
-    exec bash "$0" "$@"
-fi
-
 show_menu() {
     echo "==============================="
     echo "       Easy Deploy Menu"
@@ -16,7 +10,8 @@ show_menu() {
     echo "2) Install requirements"
     echo "3) Setup environment"
     echo "4) Clone a repo"
-    echo "5) Exit"
+    echo "5) Fetch script updates"
+    echo "6) Exit"
     echo "==============================="
 }
 
@@ -38,6 +33,10 @@ while true; do
             bash scripts/clone.sh
             ;;
         5)
+            bash scripts/self-update.sh
+            exec bash "$0"
+            ;;
+        6)
             echo "Bye!"
             exit 0
             ;;
