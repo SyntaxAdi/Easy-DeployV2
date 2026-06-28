@@ -2,118 +2,10 @@
 
 set -e
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-ENV_FILE="$REPO_ROOT/config.env"
-if [ ! -f "$ENV_FILE" ] && [ -f "$REPO_ROOT/.env" ]; then
-    ENV_FILE="$REPO_ROOT/.env"
-fi
-
-load_env() {
-    if [ -f "$ENV_FILE" ]; then
-        set -a
-        source "$ENV_FILE"
-        set +a
-    fi
-}
-
-fetch_token_from_mongo() {
-    local mongo_url="$1"
-    if [ -z "$mongo_url" ]; then
-        echo ""
-        return
-    fi
-    local token
-    token=$(mongosh "$mongo_url" --quiet --eval "
-        const db = db.getSiblingDB('deploy');
-        const doc = db.secrets.findOne({_id: 'github_token'});
-        doc ? doc.value : '';
-    " 2>/dev/null || true)
-
-    echo "$token" | tr -d '\r\n '
-}
-
-save_repo_to_mongo() {
-    local mongo_url="$1"
-    local repo_name="$2"
-    local repo_url="$3"
-    local target_path="$4"
-
-    if [ -z "$mongo_url" ]; then
-        return
-    fi
-
-    mongosh "$mongo_url" --quiet --eval "
-        const db = db.getSiblingDB('deploy');
-        db.repos.updateOne(
-            { repo_name: '$repo_name' },
-            { \$set: { repo_name: '$repo_name', repo_url: '$repo_url', target_path: '$target_path', updated_at: new Date() } },
-            { upsert: true }
-        );
-    " 2>/dev/null || true
-}
-
-get_github_token() {
-    load_env
-
-    if [ -n "$GITHUB_TOKEN" ]; then
-        echo "$GITHUB_TOKEN" | tr -d '\r\n '
-        return
-    fi
-
-    local token=""
-    if [ -n "$MONGODB_URL" ]; then
-        token=$(fetch_token_from_mongo "$MONGODB_URL")
-    fi
-
-    if [ -n "$token" ]; then
-        echo "$token" | tr -d '\r\n '
-        return
-    fi
-
-    read -rp "Enter GitHub token: " token
-    echo "$token" | tr -d '\r\n '
-}
-
-fetch_github_username() {
-    local token="$1"
-    if [ -z "$token" ]; then
-        echo ""
-        return
-    fi
-    local res
-    res=$(curl -s -H "Authorization: Bearer $token" -H "User-Agent: Easy-Deploy" https://api.github.com/user 2>/dev/null || true)
-    local user=""
-    if command -v jq &>/dev/null; then
-        user=$(echo "$res" | jq -r '.login' 2>/dev/null || true)
-    fi
-    if [ -z "$user" ] || [ "$user" = "null" ]; then
-        user=$(echo "$res" | grep -o '"login":"[^"]*"' | cut -d'"' -f4 || true)
-    fi
-    echo "$user"
-}
-
-get_authenticated_url() {
-    local url="$1"
-    local token
-    token=$(get_github_token || true)
-
-    if [ -z "$token" ]; then
-        echo "$url"
-        return
-    fi
-
-    local username
-    username=$(fetch_github_username "$token")
-    
-    local clean_url="${url#https://}"
-    clean_url="${clean_url#http://}"
-
-    if [ -n "$username" ]; then
-        echo "https://${username}:${token}@${clean_url}"
-    else
-        echo "https://x-access-token:${token}@${clean_url}"
-    fi
-}
+SCRIPT_DIR_CLONE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR_CLONE/config.sh"
+source "$SCRIPT_DIR_CLONE/auth.sh"
+source "$SCRIPT_DIR_CLONE/mongo.sh"
 
 clone_repo() {
     local url="$1"
@@ -154,15 +46,7 @@ clone_from_mongo() {
 
     echo "Fetching saved repos from MongoDB..."
     local raw_list
-    raw_list=$(mongosh "$MONGODB_URL" --quiet --eval "
-        const db = db.getSiblingDB('deploy');
-        const docs = db.repos.find().toArray();
-        docs.forEach(d => {
-            if (d.repo_name && d.repo_url) {
-                print(d.repo_name + ' | ' + d.repo_url);
-            }
-        });
-    " 2>/dev/null || true)
+    raw_list=$(fetch_repos_from_mongo "$MONGODB_URL")
 
     if [ -z "$raw_list" ]; then
         echo "No saved repositories found in MongoDB."

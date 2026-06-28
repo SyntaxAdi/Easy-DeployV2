@@ -2,76 +2,9 @@
 
 set -e
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-ENV_FILE="$REPO_ROOT/config.env"
-
-# Fallback to .env if config.env does not exist yet
-if [ ! -f "$ENV_FILE" ] && [ -f "$REPO_ROOT/.env" ]; then
-    ENV_FILE="$REPO_ROOT/.env"
-fi
-
-save_env() {
-    local key="$1"
-    local value="$2"
-    local tmp_file="${ENV_FILE}.tmp"
-    local found=0
-
-    touch "$ENV_FILE"
-    > "$tmp_file"
-
-    while IFS= read -r line || [ -n "$line" ]; do
-        if [[ "$line" =~ ^${key}= ]]; then
-            echo "${key}=${value}" >> "$tmp_file"
-            found=1
-        else
-            echo "$line" >> "$tmp_file"
-        fi
-    done < "$ENV_FILE"
-
-    if [ "$found" -eq 0 ]; then
-        echo "${key}=${value}" >> "$tmp_file"
-    fi
-
-    mv "$tmp_file" "$ENV_FILE"
-}
-
-load_env() {
-    if [ -f "$ENV_FILE" ]; then
-        set -a
-        source "$ENV_FILE"
-        set +a
-    fi
-}
-
-fetch_token_from_mongo() {
-    local mongo_url="$1"
-    local token
-    token=$(mongosh "$mongo_url" --quiet --eval "
-        const db = db.getSiblingDB('deploy');
-        const doc = db.secrets.findOne({_id: 'github_token'});
-        doc ? doc.value : '';
-    " 2>/dev/null)
-
-    if [ -n "$token" ]; then
-        echo "$token"
-    else
-        echo ""
-    fi
-}
-
-save_token_to_mongo() {
-    local mongo_url="$1"
-    local token="$2"
-
-    mongosh "$mongo_url" --quiet --eval "
-        const db = db.getSiblingDB('deploy');
-        db.secrets.updateOne(
-            {_id: 'github_token'},
-            {\$set: {value: '$token'}},
-            {upsert: true}
-        );
-    " 2>/dev/null
-}
+SCRIPT_DIR_SETUP="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR_SETUP/config.sh"
+source "$SCRIPT_DIR_SETUP/mongo.sh"
 
 setup_mongo_url() {
     if [ -n "$MONGODB_URL" ]; then
