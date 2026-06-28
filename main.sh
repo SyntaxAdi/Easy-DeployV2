@@ -10,8 +10,9 @@ show_menu() {
     echo "==============================="
     echo "1) Update packages"
     echo "2) Install requirements"
-    echo "3) Clone a repo"
-    echo "4) Exit"
+    echo "3) Setup environment"
+    echo "4) Clone a repo"
+    echo "5) Exit"
     echo "==============================="
 }
 
@@ -27,9 +28,12 @@ while true; do
             source "$SCRIPT_DIR/install.sh"
             ;;
         3)
-            source "$SCRIPT_DIR/clone.sh"
+            source "$SCRIPT_DIR/setup-env.sh"
             ;;
         4)
+            source "$SCRIPT_DIR/clone.sh"
+            ;;
+        5)
             echo "Bye!"
             exit 0
             ;;
