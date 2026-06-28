@@ -8,6 +8,7 @@ source "$SCRIPT_DIR_CLONE/auth.sh"
 source "$SCRIPT_DIR_CLONE/mongo.sh"
 source "$SCRIPT_DIR_CLONE/github.sh"
 source "$SCRIPT_DIR_CLONE/git.sh"
+source "$SCRIPT_DIR_CLONE/deps.sh"
 
 clone_from_mongo() {
     load_env
@@ -52,19 +53,10 @@ clone_from_mongo() {
     fi
 
     local target="$PWD/$repo_name"
-    local auth_url
-    auth_url=$(get_authenticated_url "$repo_url")
+    git_sync_repo "$repo_url" "$target"
 
-    if [ -d "$target" ]; then
-        echo "Directory already exists: $target"
-        echo "Pulling latest changes..."
-        (cd "$target" && git pull)
-    else
-        echo "Cloning $repo_url into $target..."
-        git clone "$auth_url" "$target"
-    fi
     echo "Done: $target"
-    post_clone_actions "$target" "$repo_name"
+    install_project_dependencies "$target" "$repo_name"
 }
 
 interactive_mode() {
