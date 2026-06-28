@@ -2,7 +2,13 @@
 
 set -e
 
-ENV_FILE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/.env"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ENV_FILE="$REPO_ROOT/config.env"
+
+# Fallback to .env if config.env does not exist yet
+if [ ! -f "$ENV_FILE" ] && [ -f "$REPO_ROOT/.env" ]; then
+    ENV_FILE="$REPO_ROOT/.env"
+fi
 
 save_env() {
     local key="$1"
