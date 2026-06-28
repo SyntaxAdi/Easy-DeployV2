@@ -74,6 +74,47 @@ get_github_token() {
     echo "$token" | tr -d '\r\n '
 }
 
+fetch_github_username() {
+    local token="$1"
+    if [ -z "$token" ]; then
+        echo ""
+        return
+    fi
+    local res
+    res=$(curl -s -H "Authorization: Bearer $token" -H "User-Agent: Easy-Deploy" https://api.github.com/user 2>/dev/null || true)
+    local user=""
+    if command -v jq &>/dev/null; then
+        user=$(echo "$res" | jq -r '.login' 2>/dev/null || true)
+    fi
+    if [ -z "$user" ] || [ "$user" = "null" ]; then
+        user=$(echo "$res" | grep -o '"login":"[^"]*"' | cut -d'"' -f4 || true)
+    fi
+    echo "$user"
+}
+
+get_authenticated_url() {
+    local url="$1"
+    local token
+    token=$(get_github_token || true)
+
+    if [ -z "$token" ]; then
+        echo "$url"
+        return
+    fi
+
+    local username
+    username=$(fetch_github_username "$token")
+    
+    local clean_url="${url#https://}"
+    clean_url="${clean_url#http://}"
+
+    if [ -n "$username" ]; then
+        echo "https://${username}:${token}@${clean_url}"
+    else
+        echo "https://x-access-token:${token}@${clean_url}"
+    fi
+}
+
 clone_repo() {
     local url="$1"
     local default_name
@@ -83,13 +124,16 @@ clone_repo() {
     local folder_name="${custom_name:-$default_name}"
     local target="$PWD/$folder_name"
 
+    local auth_url
+    auth_url=$(get_authenticated_url "$url")
+
     if [ -d "$target" ]; then
         echo "Directory already exists: $target"
         echo "Pulling latest changes..."
         (cd "$target" && git pull)
     else
         echo "Cloning $url into $target..."
-        git clone "$url" "$target"
+        git clone "$auth_url" "$target"
     fi
 
     load_env
@@ -150,13 +194,16 @@ clone_from_mongo() {
     fi
 
     local target="$PWD/$repo_name"
+    local auth_url
+    auth_url=$(get_authenticated_url "$repo_url")
+
     if [ -d "$target" ]; then
         echo "Directory already exists: $target"
         echo "Pulling latest changes..."
         (cd "$target" && git pull)
     else
         echo "Cloning $repo_url into $target..."
-        git clone "$repo_url" "$target"
+        git clone "$auth_url" "$target"
     fi
     echo "Done: $target"
 }
