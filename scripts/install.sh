@@ -21,11 +21,9 @@ echo "[4/4] Installing mongosh..."
 if command -v mongosh &>/dev/null; then
     echo "mongosh already installed"
 else
-    sudo apt install -y -qq gnupg curl
-    curl -fsSL https://www.mongodb.org/static/pgp/server-7.0.asc | sudo gpg --dearmor -o /usr/share/keyrings/mongodb-server-7.0.gpg
-    echo "deb [ signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/7.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-7.0.list
-    sudo apt update -qq
-    sudo apt install -y -qq mongosh
+    curl -fsSL https://downloads.mongodb.com/compass/mongodb-mongosh_2.9.0_amd64.deb -o /tmp/mongosh.deb
+    sudo dpkg -i /tmp/mongosh.deb
+    rm /tmp/mongosh.deb
 fi
 
 echo ""
