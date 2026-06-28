@@ -16,7 +16,8 @@ show_menu() {
     echo "3) Install requirements"
     echo "4) Setup environment"
     echo "5) Clone a repo"
-    echo "6) Exit"
+    echo "6) One-click Deploy"
+    echo "7) Exit"
     echo "==============================="
 }
 
@@ -46,6 +47,9 @@ while true; do
             bash scripts/clone.sh
             ;;
         6)
+            bash scripts/one-click.sh
+            ;;
+        7)
             echo "Bye!"
             exit 0
             ;;

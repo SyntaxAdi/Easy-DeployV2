@@ -227,3 +227,30 @@ fetch_repos_from_mongo() {
     echo "$output"
 }
 
+fetch_repo_details_from_mongo() {
+    local mongo_url="$1"
+    local repo_name="$2"
+    if [ -z "$mongo_url" ] || [ -z "$repo_name" ]; then
+        return 1
+    fi
+
+    local escaped_repo_name
+    escaped_repo_name=$(echo "$repo_name" | sed "s/'/\\\\'/g")
+
+    local output
+    local exit_code=0
+    output=$(mongosh "$mongo_url" --quiet --eval "
+        const d = db.getSiblingDB('deploy');
+        const doc = d.repos.findOne({ repo_name: '$escaped_repo_name' });
+        if (doc) {
+            print(JSON.stringify(doc));
+        }
+    " 2>&1) || exit_code=$?
+
+    if [ $exit_code -ne 0 ]; then
+        echo "MongoDB error fetching repo details: $output" >&2
+        return 1
+    fi
+    echo "$output"
+}
+
