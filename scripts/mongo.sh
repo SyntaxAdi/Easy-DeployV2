@@ -129,6 +129,7 @@ update_repo_env_file_in_mongo() {
     local mongo_url="$1"
     local repo_name="$2"
     local env_file="$3"
+    local env_content="$4"
 
     if [ -z "$mongo_url" ]; then
         return
@@ -136,9 +137,18 @@ update_repo_env_file_in_mongo() {
 
     local escaped_repo_name
     local escaped_env_file
+    local escaped_env_content
 
     escaped_repo_name=$(echo "$repo_name" | sed "s/'/\\\\'/g")
     escaped_env_file=$(echo "$env_file" | sed "s/'/\\\\'/g")
+
+    if command -v python3 &>/dev/null; then
+        escaped_env_content=$(echo -n "$env_content" | python3 -c 'import json, sys; print(json.dumps(sys.stdin.read()))')
+    else
+        local cleaned
+        cleaned=$(echo "$env_content" | sed "s/'/\\\\'/g")
+        escaped_env_content="'$cleaned'"
+    fi
 
     local output
     local exit_code=0
@@ -147,7 +157,7 @@ update_repo_env_file_in_mongo() {
         const d = db.getSiblingDB('deploy');
         d.repos.updateOne(
             { repo_name: '$escaped_repo_name' },
-            { \$set: { env_file: '$escaped_env_file', updated_at: new Date() } }
+            { \$set: { env_file: '$escaped_env_file', env_content: $escaped_env_content, updated_at: new Date() } }
         );
     " 2>&1) || exit_code=$?
 

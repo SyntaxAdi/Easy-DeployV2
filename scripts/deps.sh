@@ -29,6 +29,7 @@ setup_env_file() {
     echo "3) Enter KEY=VALUE lines"
     read -rp "Choose option: " env_opt
 
+    local env_content=""
     case "$env_opt" in
         1)
             echo "Enter environment variables (press Enter on empty variable name to finish):"
@@ -39,7 +40,14 @@ setup_env_file() {
                     break
                 fi
                 read -rp "Value for $var_name: " var_val
-                echo "${var_name}=${var_val}" >> "$env_path"
+                local line="${var_name}=${var_val}"
+                echo "$line" >> "$env_path"
+                if [ -z "$env_content" ]; then
+                    env_content="$line"
+                else
+                    env_content="${env_content}
+${line}"
+                fi
             done
             ;;
         2)
@@ -51,6 +59,12 @@ setup_env_file() {
                     break
                 fi
                 echo "$line" >> "$env_path"
+                if [ -z "$env_content" ]; then
+                    env_content="$line"
+                else
+                    env_content="${env_content}
+${line}"
+                fi
             done
             ;;
         3)
@@ -63,6 +77,12 @@ setup_env_file() {
                 fi
                 if [[ "$line" =~ = ]]; then
                     echo "$line" >> "$env_path"
+                    if [ -z "$env_content" ]; then
+                        env_content="$line"
+                    else
+                        env_content="${env_content}
+${line}"
+                    fi
                 else
                     echo "Invalid format, must contain '='."
                 fi
@@ -79,10 +99,10 @@ setup_env_file() {
     # Save to MongoDB
     load_env
     if [ -n "$MONGODB_URL" ] && [ -n "$repo_name" ]; then
-        if update_repo_env_file_in_mongo "$MONGODB_URL" "$repo_name" "$env_file_name"; then
-            echo "Saved environment file name to MongoDB."
+        if update_repo_env_file_in_mongo "$MONGODB_URL" "$repo_name" "$env_file_name" "$env_content"; then
+            echo "Saved environment file name and contents to MongoDB."
         else
-            echo "Warning: Failed to save environment file name to MongoDB." >&2
+            echo "Warning: Failed to save environment details to MongoDB." >&2
         fi
     fi
 }
