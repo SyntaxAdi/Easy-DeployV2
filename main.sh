@@ -8,11 +8,11 @@ show_menu() {
     echo "==============================="
     echo "       Easy Deploy Menu"
     echo "==============================="
-    echo "1) Update packages"
-    echo "2) Install requirements"
-    echo "3) Setup environment"
-    echo "4) Clone a repo"
-    echo "5) Fetch script updates"
+    echo "1) Fetch script updates"
+    echo "2) Update packages"
+    echo "3) Install requirements"
+    echo "4) Setup environment"
+    echo "5) Clone a repo"
     echo "6) Exit"
     echo "==============================="
 }
@@ -23,20 +23,20 @@ while true; do
 
     case "$choice" in
         1)
-            bash scripts/updates.sh
-            ;;
-        2)
-            bash scripts/install.sh
-            ;;
-        3)
-            bash scripts/setup-env.sh
-            ;;
-        4)
-            bash scripts/clone.sh
-            ;;
-        5)
             bash scripts/self-update.sh
             exec bash "$0"
+            ;;
+        2)
+            bash scripts/updates.sh
+            ;;
+        3)
+            bash scripts/install.sh
+            ;;
+        4)
+            bash scripts/setup-env.sh
+            ;;
+        5)
+            bash scripts/clone.sh
             ;;
         6)
             echo "Bye!"
