@@ -1,16 +1,17 @@
 #!/bin/bash
 
-set -e
-
 LOCAL_REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 if [ -d "$LOCAL_REPO_DIR/.git" ]; then
-    (
-        cd "$LOCAL_REPO_DIR"
-        git pull origin main --quiet 2>/dev/null || true
-    )
-    clear
-    echo "Scripts updated to latest version."
+    OUTPUT=$(cd "$LOCAL_REPO_DIR" && git pull origin main 2>&1)
+    if echo "$OUTPUT" | grep -q "Already up to date"; then
+        exit 0
+    else
+        clear
+        echo "Scripts updated to latest version."
+        exit 1
+    fi
 else
     echo "Not a git repo. Skipping update."
+    exit 0
 fi

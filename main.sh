@@ -4,6 +4,9 @@ set -e
 
 # Auto-update scripts on startup
 bash scripts/self-update.sh
+if [ $? -eq 1 ]; then
+    exec bash "$0" "$@"
+fi
 
 show_menu() {
     echo "==============================="
