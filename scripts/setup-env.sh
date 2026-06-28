@@ -2,7 +2,7 @@
 
 set -e
 
-ENV_FILE="$(dirname "$0")/../.env"
+ENV_FILE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/.env"
 
 save_env() {
     local key="$1"
