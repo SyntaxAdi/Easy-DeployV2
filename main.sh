@@ -4,6 +4,10 @@ set -e
 
 show_menu() {
     clear
+    if [ -n "$1" ]; then
+        echo "$1"
+        echo ""
+    fi
     echo "==============================="
     echo "       Easy Deploy Menu"
     echo "==============================="
@@ -16,8 +20,11 @@ show_menu() {
     echo "==============================="
 }
 
+MSG=""
+
 while true; do
-    show_menu
+    show_menu "$MSG"
+    MSG=""
     read -rp "Choose an option: " choice
 
     case "$choice" in
@@ -33,6 +40,7 @@ while true; do
             ;;
         4)
             bash scripts/setup-env.sh
+            MSG="Environment configured successfully."
             ;;
         5)
             bash scripts/clone.sh

@@ -23,12 +23,22 @@ get_github_token() {
     fi
 
     if [ -n "$token" ]; then
+        export GITHUB_TOKEN="$token"
         echo "$token" | tr -d '\r\n '
         return
     fi
 
-    read -rp "Enter GitHub token: " token
-    echo "$token" | tr -d '\r\n '
+    if [ -t 0 ]; then
+        read -rp "Enter GitHub token: " token
+    else
+        read -rp "Enter GitHub token: " token < /dev/tty 2>/dev/null || true
+    fi
+
+    token=$(echo "$token" | tr -d '\r\n ')
+    if [ -n "$token" ]; then
+        export GITHUB_TOKEN="$token"
+    fi
+    echo "$token"
 }
 
 fetch_github_username() {
@@ -51,8 +61,11 @@ fetch_github_username() {
 
 get_authenticated_url() {
     local url="$1"
-    local token
-    token=$(get_github_token || true)
+    local token="${2:-}"
+
+    if [ -z "$token" ]; then
+        token=$(get_github_token || true)
+    fi
 
     if [ -z "$token" ]; then
         echo "$url"

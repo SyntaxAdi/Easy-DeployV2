@@ -9,6 +9,7 @@ source "$SCRIPT_DIR_CLONE/mongo.sh"
 
 clone_repo() {
     local url="$1"
+    local token="${2:-}"
     local default_name
     default_name=$(basename "$url" .git)
 
@@ -17,7 +18,7 @@ clone_repo() {
     local target="$PWD/$folder_name"
 
     local auth_url
-    auth_url=$(get_authenticated_url "$url")
+    auth_url=$(get_authenticated_url "$url" "$token")
 
     if [ -d "$target" ]; then
         echo "Directory already exists: $target"
@@ -137,7 +138,7 @@ interactive_mode() {
     fi
 
     local url="https://github.com/$selected.git"
-    clone_repo "$url"
+    clone_repo "$url" "$token"
 }
 
 echo "--- Clone Repo ---"

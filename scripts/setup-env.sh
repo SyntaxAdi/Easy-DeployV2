@@ -51,6 +51,7 @@ setup_github_token() {
     fi
 }
 
+clear
 echo "=== Environment Setup ==="
 echo ""
 
@@ -59,6 +60,3 @@ load_env
 setup_mongo_url
 echo ""
 setup_github_token
-
-clear
-echo "Environment configured."
