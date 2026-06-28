@@ -7,6 +7,29 @@ source "$SCRIPT_DIR_CLONE/config.sh"
 source "$SCRIPT_DIR_CLONE/auth.sh"
 source "$SCRIPT_DIR_CLONE/mongo.sh"
 
+post_clone_actions() {
+    local target="$1"
+    echo ""
+    echo "--- Post-Clone Actions ---"
+    echo "1) Install dependencies/requirements"
+    echo "2) Back to main menu"
+    read -rp "Choose option: " post_choice
+
+    case "$post_choice" in
+        1)
+            read -rp "Enter install command (e.g. pip3 install -r requirements.txt): " install_cmd
+            if [ -n "$install_cmd" ]; then
+                echo "Executing: $install_cmd inside $target..."
+                (cd "$target" && eval "$install_cmd")
+            fi
+            ;;
+        *)
+            ;;
+    esac
+
+    clear
+}
+
 clone_repo() {
     local url="$1"
     local token="${2:-}"
@@ -36,6 +59,7 @@ clone_repo() {
     fi
 
     echo "Done: $target"
+    post_clone_actions "$target"
 }
 
 clone_from_mongo() {
@@ -91,6 +115,7 @@ clone_from_mongo() {
         git clone "$auth_url" "$target"
     fi
     echo "Done: $target"
+    post_clone_actions "$target"
 }
 
 interactive_mode() {
