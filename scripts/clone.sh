@@ -8,8 +8,6 @@ if [ ! -f "$ENV_FILE" ] && [ -f "$REPO_ROOT/.env" ]; then
     ENV_FILE="$REPO_ROOT/.env"
 fi
 
-CLONE_DIR="/opt/bots"
-
 load_env() {
     if [ -f "$ENV_FILE" ]; then
         set -a
@@ -32,6 +30,26 @@ fetch_token_from_mongo() {
     " 2>/dev/null || true)
 
     echo "$token" | tr -d '\r\n '
+}
+
+save_repo_to_mongo() {
+    local mongo_url="$1"
+    local repo_name="$2"
+    local repo_url="$3"
+    local target_path="$4"
+
+    if [ -z "$mongo_url" ]; then
+        return
+    fi
+
+    mongosh "$mongo_url" --quiet --eval "
+        const db = db.getSiblingDB('deploy');
+        db.repos.updateOne(
+            { repo_name: '$repo_name' },
+            { \$set: { repo_name: '$repo_name', repo_url: '$repo_url', target_path: '$target_path', updated_at: new Date() } },
+            { upsert: true }
+        );
+    " 2>/dev/null || true
 }
 
 get_github_token() {
@@ -58,20 +76,28 @@ get_github_token() {
 
 clone_repo() {
     local url="$1"
-    local repo_name
-    repo_name=$(basename "$url" .git)
-    local target="$CLONE_DIR/$repo_name"
+    local default_name
+    default_name=$(basename "$url" .git)
+
+    read -rp "Enter folder name (press Enter for default '$default_name'): " custom_name
+    local folder_name="${custom_name:-$default_name}"
+    local target="$PWD/$folder_name"
 
     if [ -d "$target" ]; then
         echo "Directory already exists: $target"
         echo "Pulling latest changes..."
-        cd "$target"
-        git pull
+        (cd "$target" && git pull)
     else
         echo "Cloning $url into $target..."
-        mkdir -p "$CLONE_DIR"
         git clone "$url" "$target"
     fi
+
+    load_env
+    if [ -n "$MONGODB_URL" ]; then
+        save_repo_to_mongo "$MONGODB_URL" "$folder_name" "$url" "$target"
+        echo "Saved repository details to MongoDB."
+    fi
+
     echo "Done: $target"
 }
 
