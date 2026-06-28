@@ -49,38 +49,14 @@ save_token_to_mongo() {
             {upsert: true}
         );
     " 2>/dev/null
-
-    echo "GitHub token saved to MongoDB."
 }
 
 setup_mongo_url() {
-    load_env
-
-    if [ -n "$MONGODB_URL" ]; then
-        echo "Current MongoDB URL: $MONGODB_URL"
-        read -rp "Keep this URL? (y/n): " keep
-        if [ "$keep" != "y" ]; then
-            read -rp "Enter new MongoDB URL: " MONGODB_URL
-            save_env "MONGODB_URL" "$MONGODB_URL"
-        fi
-    else
-        read -rp "Enter MongoDB URL: " MONGODB_URL
-        save_env "MONGODB_URL" "$MONGODB_URL"
-    fi
-    echo ""
+    read -rp "Enter MongoDB URL: " MONGODB_URL
+    save_env "MONGODB_URL" "$MONGODB_URL"
 }
 
 setup_github_token() {
-    load_env
-
-    if [ -n "$GITHUB_TOKEN" ]; then
-        echo "GitHub token already set in .env."
-        read -rp "Update it? (y/n): " update
-        if [ "$update" != "y" ]; then
-            return
-        fi
-    fi
-
     read -rp "Enter GitHub token (or leave blank to fetch from MongoDB): " token
 
     if [ -z "$token" ]; then
@@ -95,11 +71,24 @@ setup_github_token() {
 
     save_env "GITHUB_TOKEN" "$token"
     save_token_to_mongo "$MONGODB_URL" "$token"
-    echo ""
 }
 
 echo "=== Environment Setup ==="
 echo ""
+
+load_env
+
+if [ -n "$MONGODB_URL" ] && [ -n "$GITHUB_TOKEN" ]; then
+    echo "MongoDB URL and GitHub token already configured."
+    read -rp "Do you want to modify? (y/n): " modify
+    if [ "$modify" != "y" ]; then
+        clear
+        return 2>/dev/null || exit 0
+    fi
+fi
+
 setup_mongo_url
 setup_github_token
+
+clear
 echo "Environment configured."
