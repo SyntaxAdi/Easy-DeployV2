@@ -31,4 +31,7 @@ echo "=== Installed ==="
 git --version
 fzf --version
 mongosh --version
-echo "Done."
+echo ""
+echo "All dependencies installed successfully."
+
+clear
