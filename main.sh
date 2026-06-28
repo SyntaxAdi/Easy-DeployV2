@@ -2,9 +2,8 @@
 
 set -e
 
-clear
-
 show_menu() {
+    clear
     echo "==============================="
     echo "       Easy Deploy Menu"
     echo "==============================="
