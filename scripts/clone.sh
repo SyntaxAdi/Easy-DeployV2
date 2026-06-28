@@ -6,61 +6,8 @@ SCRIPT_DIR_CLONE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR_CLONE/config.sh"
 source "$SCRIPT_DIR_CLONE/auth.sh"
 source "$SCRIPT_DIR_CLONE/mongo.sh"
-
-post_clone_actions() {
-    local target="$1"
-    echo ""
-    echo "--- Post-Clone Actions ---"
-    echo "1) Install dependencies/requirements"
-    echo "2) Back to main menu"
-    read -rp "Choose option: " post_choice
-
-    case "$post_choice" in
-        1)
-            read -rp "Enter install command (e.g. pip3 install -r requirements.txt): " install_cmd
-            if [ -n "$install_cmd" ]; then
-                echo "Executing: $install_cmd inside $target..."
-                (cd "$target" && eval "$install_cmd")
-            fi
-            ;;
-        *)
-            ;;
-    esac
-
-    clear
-}
-
-clone_repo() {
-    local url="$1"
-    local token="${2:-}"
-    local default_name
-    default_name=$(basename "$url" .git)
-
-    read -rp "Enter folder name (press Enter for default '$default_name'): " custom_name
-    local folder_name="${custom_name:-$default_name}"
-    local target="$PWD/$folder_name"
-
-    local auth_url
-    auth_url=$(get_authenticated_url "$url" "$token")
-
-    if [ -d "$target" ]; then
-        echo "Directory already exists: $target"
-        echo "Pulling latest changes..."
-        (cd "$target" && git pull)
-    else
-        echo "Cloning $url into $target..."
-        git clone "$auth_url" "$target"
-    fi
-
-    load_env
-    if [ -n "$MONGODB_URL" ]; then
-        save_repo_to_mongo "$MONGODB_URL" "$folder_name" "$url" "$target"
-        echo "Saved repository details to MongoDB."
-    fi
-
-    echo "Done: $target"
-    post_clone_actions "$target"
-}
+source "$SCRIPT_DIR_CLONE/github.sh"
+source "$SCRIPT_DIR_CLONE/git.sh"
 
 clone_from_mongo() {
     load_env
@@ -120,38 +67,8 @@ clone_from_mongo() {
 
 interactive_mode() {
     local token="$1"
-
-    if [ -z "$token" ]; then
-        echo "Error: GitHub token unavailable."
-        return 1
-    fi
-
-    echo "Fetching repos from GitHub..."
-    local response
-    response=$(curl -s -H "Authorization: Bearer $token" \
-        -H "User-Agent: Easy-Deploy" \
-        -H "Accept: application/vnd.github.v3+json" \
-        "https://api.github.com/user/repos?per_page=100&affiliation=owner,collaborator,organization_member&sort=updated")
-
-    local repos=""
-    if command -v jq &>/dev/null; then
-        repos=$(echo "$response" | jq -r '.[].full_name' 2>/dev/null || true)
-    fi
-
-    if [ -z "$repos" ]; then
-        repos=$(echo "$response" | grep -o '"full_name":"[^"]*"' | cut -d'"' -f4 || true)
-    fi
-
-    if [ -z "$repos" ]; then
-        local msg
-        msg=$(echo "$response" | grep -o '"message":"[^"]*"' | cut -d'"' -f4 || true)
-        if [ -n "$msg" ]; then
-            echo "GitHub API Error: $msg"
-        else
-            echo "No repos found or invalid token."
-        fi
-        return 1
-    fi
+    local repos
+    repos=$(fetch_repos_from_github "$token") || return 1
 
     echo "Select a repo to clone:"
     local selected

@@ -16,8 +16,8 @@ fetch_token_from_mongo() {
     fi
     local token
     token=$(mongosh "$mongo_url" --quiet --eval "
-        const db = db.getSiblingDB('deploy');
-        const doc = db.secrets.findOne({_id: 'github_token'});
+        const d = db.getSiblingDB('deploy');
+        const doc = d.secrets.findOne({_id: 'github_token'});
         doc ? doc.value : '';
     " 2>/dev/null || true)
 
@@ -29,8 +29,8 @@ save_token_to_mongo() {
     local token="$2"
 
     mongosh "$mongo_url" --quiet --eval "
-        const db = db.getSiblingDB('deploy');
-        db.secrets.updateOne(
+        const d = db.getSiblingDB('deploy');
+        d.secrets.updateOne(
             {_id: 'github_token'},
             {\$set: {value: '$token'}},
             {upsert: true}
@@ -49,8 +49,8 @@ save_repo_to_mongo() {
     fi
 
     mongosh "$mongo_url" --quiet --eval "
-        const db = db.getSiblingDB('deploy');
-        db.repos.updateOne(
+        const d = db.getSiblingDB('deploy');
+        d.repos.updateOne(
             { repo_name: '$repo_name' },
             { \$set: { repo_name: '$repo_name', repo_url: '$repo_url', target_path: '$target_path', updated_at: new Date() } },
             { upsert: true }
@@ -65,11 +65,11 @@ fetch_repos_from_mongo() {
         return
     fi
     mongosh "$mongo_url" --quiet --eval "
-        const db = db.getSiblingDB('deploy');
-        const docs = db.repos.find().toArray();
-        docs.forEach(d => {
-            if (d.repo_name && d.repo_url) {
-                print(d.repo_name + ' | ' + d.repo_url);
+        const d = db.getSiblingDB('deploy');
+        const docs = d.repos.find().toArray();
+        docs.forEach(doc => {
+            if (doc.repo_name && doc.repo_url) {
+                print(doc.repo_name + ' | ' + doc.repo_url);
             }
         });
     " 2>/dev/null || true
