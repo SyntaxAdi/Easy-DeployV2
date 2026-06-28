@@ -9,6 +9,84 @@ SCRIPT_DIR_DEPS="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR_DEPS/config.sh"
 source "$SCRIPT_DIR_DEPS/mongo.sh"
 
+setup_env_file() {
+    local target="$1"
+    local repo_name="$2"
+    
+    read -rp "Do you want to add an env file? (y/n): " add_env
+    if [[ ! "$add_env" =~ ^[Yy]$ ]]; then
+        return 0
+    fi
+
+    read -rp "Enter env file name (press Enter for default '.env'): " env_file_name
+    env_file_name="${env_file_name:-.env}"
+    local env_path="$target/$env_file_name"
+
+    echo ""
+    echo "How would you like to enter environment variables?"
+    echo "1) Key-value pairs one by one"
+    echo "2) Paste entire env file content"
+    echo "3) Enter KEY=VALUE lines"
+    read -rp "Choose option: " env_opt
+
+    case "$env_opt" in
+        1)
+            echo "Enter environment variables (press Enter on empty variable name to finish):"
+            touch "$env_path"
+            while true; do
+                read -rp "Variable name: " var_name
+                if [ -z "$var_name" ]; then
+                    break
+                fi
+                read -rp "Value for $var_name: " var_val
+                echo "${var_name}=${var_val}" >> "$env_path"
+            done
+            ;;
+        2)
+            echo "Paste your env file content below (press Enter on empty line or type EOF to finish):"
+            touch "$env_path"
+            while true; do
+                read -r line
+                if [ -z "$line" ] || [ "$line" = "EOF" ]; then
+                    break
+                fi
+                echo "$line" >> "$env_path"
+            done
+            ;;
+        3)
+            echo "Enter KEY=VALUE lines (press Enter on empty line to finish):"
+            touch "$env_path"
+            while true; do
+                read -rp "> " line
+                if [ -z "$line" ]; then
+                    break
+                fi
+                if [[ "$line" =~ = ]]; then
+                    echo "$line" >> "$env_path"
+                else
+                    echo "Invalid format, must contain '='."
+                fi
+            done
+            ;;
+        *)
+            echo "Invalid option. Env file setup skipped."
+            return 1
+            ;;
+    esac
+
+    echo "Environment file successfully saved at: $env_path"
+
+    # Save to MongoDB
+    load_env
+    if [ -n "$MONGODB_URL" ] && [ -n "$repo_name" ]; then
+        if update_repo_env_file_in_mongo "$MONGODB_URL" "$repo_name" "$env_file_name"; then
+            echo "Saved environment file name to MongoDB."
+        else
+            echo "Warning: Failed to save environment file name to MongoDB." >&2
+        fi
+    fi
+}
+
 install_project_dependencies() {
     local target="$1"
     local repo_name="$2"
@@ -20,6 +98,7 @@ install_project_dependencies() {
 
     case "$post_choice" in
         1)
+            local setup_success=0
             read -rp "Is this a Python tech stack project? (y/n): " is_python
             if [[ "$is_python" =~ ^[Yy]$ ]]; then
                 local venv_cmd="python3 -m venv venv"
@@ -39,6 +118,7 @@ install_project_dependencies() {
                             fi
                         fi
 
+                        # Save to MongoDB
                         load_env
                         if [ -n "$MONGODB_URL" ] && [ -n "$repo_name" ]; then
                             if update_repo_commands_in_mongo "$MONGODB_URL" "$repo_name" "$venv_cmd" "$install_cmd" "$extra_cmd"; then
@@ -47,6 +127,7 @@ install_project_dependencies() {
                                 echo "Warning: Failed to save setup commands to MongoDB." >&2
                             fi
                         fi
+                        setup_success=1
                     else
                         echo "Error: Failed to install requirements." >&2
                     fi
@@ -66,8 +147,16 @@ install_project_dependencies() {
                                 echo "Warning: Failed to save install command to MongoDB." >&2
                             fi
                         fi
+                        setup_success=1
                     fi
+                else
+                    # User skipped entering install command
+                    setup_success=1
                 fi
+            fi
+            
+            if [ "$setup_success" -eq 1 ]; then
+                setup_env_file "$target" "$repo_name"
             fi
             ;;
         *)

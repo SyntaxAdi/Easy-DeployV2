@@ -125,6 +125,38 @@ update_repo_commands_in_mongo() {
     fi
 }
 
+update_repo_env_file_in_mongo() {
+    local mongo_url="$1"
+    local repo_name="$2"
+    local env_file="$3"
+
+    if [ -z "$mongo_url" ]; then
+        return
+    fi
+
+    local escaped_repo_name
+    local escaped_env_file
+
+    escaped_repo_name=$(echo "$repo_name" | sed "s/'/\\\\'/g")
+    escaped_env_file=$(echo "$env_file" | sed "s/'/\\\\'/g")
+
+    local output
+    local exit_code=0
+
+    output=$(mongosh "$mongo_url" --quiet --eval "
+        const d = db.getSiblingDB('deploy');
+        d.repos.updateOne(
+            { repo_name: '$escaped_repo_name' },
+            { \$set: { env_file: '$escaped_env_file', updated_at: new Date() } }
+        );
+    " 2>&1) || exit_code=$?
+
+    if [ $exit_code -ne 0 ]; then
+        echo "MongoDB error updating repo env file: $output" >&2
+        return 1
+    fi
+}
+
 fetch_repos_from_mongo() {
     local mongo_url="$1"
     if [ -z "$mongo_url" ]; then
