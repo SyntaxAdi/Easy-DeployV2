@@ -4,6 +4,9 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)/scripts"
 
+# Auto-update scripts on startup
+source "$SCRIPT_DIR/self-update.sh"
+
 show_menu() {
     echo "==============================="
     echo "       Easy Deploy Menu"
