@@ -25,7 +25,7 @@ while true; do
 
     case "$choice" in
         1)
-            source "$SCRIPT_DIR/update.sh"
+            source "$SCRIPT_DIR/updates.sh"
             ;;
         2)
             source "$SCRIPT_DIR/install.sh"
