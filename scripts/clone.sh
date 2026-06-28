@@ -2,7 +2,59 @@
 
 set -e
 
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ENV_FILE="$REPO_ROOT/config.env"
+if [ ! -f "$ENV_FILE" ] && [ -f "$REPO_ROOT/.env" ]; then
+    ENV_FILE="$REPO_ROOT/.env"
+fi
+
 CLONE_DIR="/opt/bots"
+
+load_env() {
+    if [ -f "$ENV_FILE" ]; then
+        set -a
+        source "$ENV_FILE"
+        set +a
+    fi
+}
+
+fetch_token_from_mongo() {
+    local mongo_url="$1"
+    if [ -z "$mongo_url" ]; then
+        echo ""
+        return
+    fi
+    local token
+    token=$(mongosh "$mongo_url" --quiet --eval "
+        const db = db.getSiblingDB('deploy');
+        const doc = db.secrets.findOne({_id: 'github_token'});
+        doc ? doc.value : '';
+    " 2>/dev/null)
+
+    echo "$token"
+}
+
+get_github_token() {
+    load_env
+
+    if [ -n "$GITHUB_TOKEN" ]; then
+        echo "$GITHUB_TOKEN"
+        return
+    fi
+
+    local token=""
+    if [ -n "$MONGODB_URL" ]; then
+        token=$(fetch_token_from_mongo "$MONGODB_URL")
+    fi
+
+    if [ -n "$token" ]; then
+        echo "$token"
+        return
+    fi
+
+    read -rp "Enter GitHub token: " token
+    echo "$token"
+}
 
 clone_repo() {
     local url="$1"
@@ -26,6 +78,11 @@ clone_repo() {
 interactive_mode() {
     local token="$1"
 
+    if [ -z "$token" ]; then
+        echo "Error: GitHub token unavailable."
+        return 1
+    fi
+
     echo "Fetching repos from GitHub..."
     local repos
     repos=$(curl -s -H "Authorization: token $token" \
@@ -36,7 +93,7 @@ interactive_mode() {
 
     if [ -z "$repos" ]; then
         echo "No repos found or invalid token."
-        exit 1
+        return 1
     fi
 
     echo "Select a repo to clone:"
@@ -45,7 +102,7 @@ interactive_mode() {
 
     if [ -z "$selected" ]; then
         echo "No repo selected."
-        exit 1
+        return 1
     fi
 
     local url="https://github.com/$selected.git"
@@ -63,11 +120,11 @@ case "$mode" in
         clone_repo "$repo_url"
         ;;
     2)
-        read -rp "Enter GitHub token: " github_token
+        github_token=$(get_github_token)
         interactive_mode "$github_token"
         ;;
     *)
         echo "Invalid option."
-        exit 1
+        return 1 2>/dev/null || exit 1
         ;;
 esac
