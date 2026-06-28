@@ -167,6 +167,41 @@ update_repo_env_file_in_mongo() {
     fi
 }
 
+update_repo_screen_details_in_mongo() {
+    local mongo_url="$1"
+    local repo_name="$2"
+    local screen_name="$3"
+    local start_cmd="$4"
+
+    if [ -z "$mongo_url" ]; then
+        return
+    fi
+
+    local escaped_repo_name
+    local escaped_screen_name
+    local escaped_start_cmd
+
+    escaped_repo_name=$(echo "$repo_name" | sed "s/'/\\\\'/g")
+    escaped_screen_name=$(echo "$screen_name" | sed "s/'/\\\\'/g")
+    escaped_start_cmd=$(echo "$start_cmd" | sed "s/'/\\\\'/g")
+
+    local output
+    local exit_code=0
+
+    output=$(mongosh "$mongo_url" --quiet --eval "
+        const d = db.getSiblingDB('deploy');
+        d.repos.updateOne(
+            { repo_name: '$escaped_repo_name' },
+            { \$set: { screen_name: '$escaped_screen_name', start_cmd: '$escaped_start_cmd', updated_at: new Date() } }
+        );
+    " 2>&1) || exit_code=$?
+
+    if [ $exit_code -ne 0 ]; then
+        echo "MongoDB error updating repo screen details: $output" >&2
+        return 1
+    fi
+}
+
 fetch_repos_from_mongo() {
     local mongo_url="$1"
     if [ -z "$mongo_url" ]; then

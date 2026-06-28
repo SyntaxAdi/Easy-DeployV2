@@ -177,6 +177,7 @@ install_project_dependencies() {
             
             if [ "$setup_success" -eq 1 ]; then
                 setup_env_file "$target" "$repo_name"
+                start_bot_in_screen "$target" "$repo_name"
             fi
             ;;
         *)
@@ -184,6 +185,52 @@ install_project_dependencies() {
     esac
 
     clear
+}
+
+start_bot_in_screen() {
+    local target="$1"
+    local repo_name="$2"
+
+    read -rp "Do you want to start screen and start the bot? (y/n): " start_bot
+    if [[ ! "$start_bot" =~ ^[Yy]$ ]]; then
+        return 0
+    fi
+
+    read -rp "Enter screen name (press Enter for default '$repo_name'): " screen_name
+    screen_name="${screen_name:-$repo_name}"
+
+    echo "Running command: screen -S $screen_name"
+    screen -dmS "$screen_name" bash
+
+    # Wait a tiny moment for screen to initialize
+    sleep 1
+
+    read -rp "Enter start command (e.g. python3 main.py): " start_cmd
+    if [ -n "$start_cmd" ]; then
+        # Send the commands to the screen session:
+        # 1. Change directory to the target path
+        # 2. If venv exists, activate it
+        # 3. Execute the start_cmd
+        screen -S "$screen_name" -p 0 -X stuff "cd $target$(printf \\r)"
+        if [ -d "$target/venv" ]; then
+            screen -S "$screen_name" -p 0 -X stuff "source venv/bin/activate$(printf \\r)"
+        fi
+        screen -S "$screen_name" -p 0 -X stuff "${start_cmd}$(printf \\r)"
+        
+        echo "Screen session '$screen_name' started and command sent."
+    else
+        echo "No start command entered. Screen session '$screen_name' is idle."
+    fi
+
+    # Save details to MongoDB
+    load_env
+    if [ -n "$MONGODB_URL" ] && [ -n "$repo_name" ]; then
+        if update_repo_screen_details_in_mongo "$MONGODB_URL" "$repo_name" "$screen_name" "$start_cmd"; then
+            echo "Saved screen details to MongoDB."
+        else
+            echo "Warning: Failed to save screen details to MongoDB." >&2
+        fi
+    fi
 }
 
 post_clone_actions() {
