@@ -33,7 +33,7 @@ setup_github_token() {
     read -rp "Enter GitHub token (or leave blank to fetch from MongoDB): " token
 
     if [ -z "$token" ]; then
-        token=$(fetch_token_from_mongo "$MONGODB_URL")
+        token=$(fetch_token_from_mongo "$MONGODB_URL" || true)
         if [ -n "$token" ]; then
             echo "Token fetched from MongoDB."
         else
@@ -46,7 +46,7 @@ setup_github_token() {
         GITHUB_TOKEN="$token"
         save_env "GITHUB_TOKEN" "$GITHUB_TOKEN"
         if [ -n "$MONGODB_URL" ]; then
-            save_token_to_mongo "$MONGODB_URL" "$GITHUB_TOKEN"
+            save_token_to_mongo "$MONGODB_URL" "$GITHUB_TOKEN" || echo "Warning: Failed to save GitHub token to MongoDB." >&2
         fi
     fi
 }

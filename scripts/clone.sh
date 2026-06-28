@@ -18,7 +18,9 @@ clone_from_mongo() {
 
     echo "Fetching saved repos from MongoDB..."
     local raw_list
-    raw_list=$(fetch_repos_from_mongo "$MONGODB_URL")
+    if ! raw_list=$(fetch_repos_from_mongo "$MONGODB_URL"); then
+        return 1
+    fi
 
     if [ -z "$raw_list" ]; then
         echo "No saved repositories found in MongoDB."
@@ -72,7 +74,12 @@ interactive_mode() {
 
     echo "Select a repo to clone:"
     local selected
-    selected=$(echo "$repos" | fzf --height 40% --reverse --prompt "Repo> ")
+    if command -v fzf &>/dev/null; then
+        selected=$(echo "$repos" | fzf --height 40% --reverse --prompt "Repo> ")
+    else
+        echo "$repos"
+        read -rp "Enter repo (e.g. username/repo): " selected
+    fi
 
     if [ -z "$selected" ]; then
         echo "No repo selected."

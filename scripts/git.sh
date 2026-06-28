@@ -57,8 +57,11 @@ clone_repo() {
 
     load_env
     if [ -n "$MONGODB_URL" ]; then
-        save_repo_to_mongo "$MONGODB_URL" "$folder_name" "$url" "$target"
-        echo "Saved repository details to MongoDB."
+        if save_repo_to_mongo "$MONGODB_URL" "$folder_name" "$url" "$target"; then
+            echo "Saved repository details to MongoDB."
+        else
+            echo "Warning: Failed to save repository details to MongoDB." >&2
+        fi
     fi
 
     echo "Done: $target"

@@ -19,7 +19,7 @@ get_github_token() {
 
     local token=""
     if [ -n "$MONGODB_URL" ]; then
-        token=$(fetch_token_from_mongo "$MONGODB_URL")
+        token=$(fetch_token_from_mongo "$MONGODB_URL" || true)
     fi
 
     if [ -n "$token" ]; then
