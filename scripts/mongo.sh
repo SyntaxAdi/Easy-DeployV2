@@ -60,20 +60,67 @@ save_repo_to_mongo() {
     if [ -z "$mongo_url" ]; then
         return
     fi
+
+    local escaped_repo_name
+    local escaped_repo_url
+    local escaped_target_path
+    
+    escaped_repo_name=$(echo "$repo_name" | sed "s/'/\\\\'/g")
+    escaped_repo_url=$(echo "$repo_url" | sed "s/'/\\\\'/g")
+    escaped_target_path=$(echo "$target_path" | sed "s/'/\\\\'/g")
+
     local output
     local exit_code=0
 
     output=$(mongosh "$mongo_url" --quiet --eval "
         const d = db.getSiblingDB('deploy');
         d.repos.updateOne(
-            { repo_name: '$repo_name' },
-            { \$set: { repo_name: '$repo_name', repo_url: '$repo_url', target_path: '$target_path', updated_at: new Date() } },
+            { repo_name: '$escaped_repo_name' },
+            { \$set: { repo_name: '$escaped_repo_name', repo_url: '$escaped_repo_url', target_path: '$escaped_target_path', updated_at: new Date() } },
             { upsert: true }
         );
     " 2>&1) || exit_code=$?
 
     if [ $exit_code -ne 0 ]; then
         echo "MongoDB error saving repo: $output" >&2
+        return 1
+    fi
+}
+
+update_repo_commands_in_mongo() {
+    local mongo_url="$1"
+    local repo_name="$2"
+    local venv_cmd="$3"
+    local install_cmd="$4"
+    local extra_install_cmd="$5"
+
+    if [ -z "$mongo_url" ]; then
+        return
+    fi
+
+    local escaped_repo_name
+    local escaped_venv_cmd
+    local escaped_install_cmd
+    local escaped_extra_install_cmd
+
+    escaped_repo_name=$(echo "$repo_name" | sed "s/'/\\\\'/g")
+    escaped_venv_cmd=$(echo "$venv_cmd" | sed "s/'/\\\\'/g")
+    escaped_install_cmd=$(echo "$install_cmd" | sed "s/'/\\\\'/g")
+    escaped_extra_install_cmd=$(echo "$extra_install_cmd" | sed "s/'/\\\\'/g")
+
+    local output
+    local exit_code=0
+
+    output=$(mongosh "$mongo_url" --quiet --eval "
+        const d = db.getSiblingDB('deploy');
+        d.repos.updateOne(
+            { repo_name: '$escaped_repo_name' },
+            { \$set: { venv_cmd: '$escaped_venv_cmd', install_cmd: '$escaped_install_cmd', extra_install_cmd: '$escaped_extra_install_cmd', updated_at: new Date() } }
+        );
+    " 2>&1) || exit_code=$?
+
+    if [ $exit_code -ne 0 ]; then
+        echo "MongoDB error updating repo commands: $output" >&2
         return 1
     fi
 }

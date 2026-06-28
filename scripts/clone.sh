@@ -64,7 +64,7 @@ clone_from_mongo() {
         git clone "$auth_url" "$target"
     fi
     echo "Done: $target"
-    post_clone_actions "$target"
+    post_clone_actions "$target" "$repo_name"
 }
 
 interactive_mode() {
