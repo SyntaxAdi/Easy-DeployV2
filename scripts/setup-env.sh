@@ -85,10 +85,13 @@ if [ -n "$MONGODB_URL" ] && [ -n "$GITHUB_TOKEN" ]; then
         clear
         return 2>/dev/null || exit 0
     fi
+    read -rp "Enter new GitHub token: " token
+    save_env "GITHUB_TOKEN" "$token"
+    save_token_to_mongo "$MONGODB_URL" "$token"
+else
+    setup_mongo_url
+    setup_github_token
 fi
-
-setup_mongo_url
-setup_github_token
 
 clear
 echo "Environment configured."
