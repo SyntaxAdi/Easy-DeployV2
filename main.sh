@@ -2,10 +2,8 @@
 
 set -e
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)/scripts"
-
 # Auto-update scripts on startup
-source "$SCRIPT_DIR/self-update.sh"
+bash scripts/self-update.sh
 
 show_menu() {
     echo "==============================="
@@ -25,16 +23,16 @@ while true; do
 
     case "$choice" in
         1)
-            source "$SCRIPT_DIR/updates.sh"
+            bash scripts/updates.sh
             ;;
         2)
-            source "$SCRIPT_DIR/install.sh"
+            bash scripts/install.sh
             ;;
         3)
-            source "$SCRIPT_DIR/setup-env.sh"
+            bash scripts/setup-env.sh
             ;;
         4)
-            source "$SCRIPT_DIR/clone.sh"
+            bash scripts/clone.sh
             ;;
         5)
             echo "Bye!"
