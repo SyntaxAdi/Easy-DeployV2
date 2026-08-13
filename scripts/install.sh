@@ -16,8 +16,8 @@ sudo apt install -y -qq wget
 echo "[4/14] Installing curl..."
 sudo apt install -y -qq curl
 
-echo "[5/14] Installing neofetch..."
-sudo apt install -y -qq neofetch
+echo "[5/14] Installing screenfetch..."
+sudo apt install -y -qq screenfetch
 
 echo "[6/14] Installing screen..."
 sudo apt install -y -qq screen
