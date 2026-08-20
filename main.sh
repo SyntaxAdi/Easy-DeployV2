@@ -17,7 +17,8 @@ show_menu() {
     echo "4) Setup environment"
     echo "5) Clone a repo"
     echo "6) One-click Deploy"
-    echo "7) Exit"
+    echo "7) Edit Env Variables"
+    echo "8) Exit"
     echo "==============================="
 }
 
@@ -50,6 +51,9 @@ while true; do
             bash scripts/one-click.sh
             ;;
         7)
+            bash scripts/edit-env.sh
+            ;;
+        8)
             echo "Bye!"
             exit 0
             ;;
