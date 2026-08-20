@@ -5,12 +5,12 @@ set -e
 SCRIPT_DIR_EDIT_ENV="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR_EDIT_ENV/config.sh"
 source "$SCRIPT_DIR_EDIT_ENV/mongo.sh"
-
 edit_env_variables() {
     load_env
     if [ -z "$MONGODB_URL" ]; then
         echo "Error: MONGODB_URL is not set. Run setup environment first."
-        return 1
+        read -rp "Press Enter to return to main menu..."
+        return 0
     fi
 
     echo "Fetching saved repos from MongoDB..."
