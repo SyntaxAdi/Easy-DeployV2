@@ -24,13 +24,17 @@ edit_env_variables() {
         return 1
     fi
 
+    local menu_list="[Back to Main Menu]
+$raw_list"
+
     echo "Select a repo to edit environment variables:"
     local selected=""
     if command -v fzf &>/dev/null; then
-        selected=$(echo "$raw_list" | fzf --height 40% --reverse --prompt "Repo> ")
+        selected=$(echo "$menu_list" | fzf --height 40% --reverse --prompt "Repo> ")
     else
         local i=1
         declare -A repo_map
+        echo "0) [Back to Main Menu]"
         while IFS= read -r line; do
             if [ -n "$line" ]; then
                 repo_map[$i]="$line"
@@ -39,12 +43,14 @@ edit_env_variables() {
             fi
         done <<< "$raw_list"
         read -rp "Enter number: " repo_num
+        if [ "$repo_num" = "0" ] || [ -z "$repo_num" ]; then
+            return 0
+        fi
         selected="${repo_map[$repo_num]}"
     fi
 
-    if [ -z "$selected" ]; then
-        echo "No repo selected."
-        return 1
+    if [ -z "$selected" ] || [ "$selected" = "[Back to Main Menu]" ]; then
+        return 0
     fi
 
     local repo_name
