@@ -122,7 +122,9 @@ ${new_key}=${new_val}"
         echo "Select a variable to manage:"
         local selected_key=""
         
-        local keys_str=""
+        local keys_str="[Back to Main Menu]
+[Add New Variable]
+"
         for k in "${keys[@]}"; do
             keys_str="${keys_str}${k}
 "
@@ -130,6 +132,24 @@ ${new_key}=${new_val}"
         
         if command -v fzf &>/dev/null; then
             selected_key=$(echo -n "$keys_str" | fzf --height 40% --reverse --prompt "Var> ")
+            if [ "$selected_key" = "[Back to Main Menu]" ] || [ -z "$selected_key" ]; then
+                break
+            elif [ "$selected_key" = "[Add New Variable]" ]; then
+                read -rp "Enter Variable Name: " new_key
+                read -rp "Enter Variable Value: " new_val
+                if [ -n "$new_key" ]; then
+                    new_key=$(echo "$new_key" | xargs)
+                    env_content="${env_content}
+${new_key}=${new_val}"
+                    update_repo_env_file_in_mongo "$MONGODB_URL" "$repo_name" "$env_file" "$env_content"
+                    local target_path
+                    target_path=$(echo "$repo_json" | jq -r '.target_path // ""')
+                    if [ -d "$target_path" ]; then
+                        echo -n "$env_content" > "$target_path/$env_file"
+                    fi
+                fi
+                continue
+            fi
         else
             local i=1
             declare -A key_map
@@ -139,7 +159,7 @@ ${new_key}=${new_val}"
                 i=$((i+1))
             done
             echo "$i) [Add New Variable]"
-            echo "$((i+1))) [Back]"
+            echo "$((i+1))) [Back to Main Menu]"
             read -rp "Enter option: " var_choice
             if [ "$var_choice" -eq "$i" ]; then
                 read -rp "Enter Variable Name: " new_key
