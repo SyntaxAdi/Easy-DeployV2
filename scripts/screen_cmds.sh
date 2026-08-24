@@ -19,44 +19,33 @@ list_screens() {
     local screen_output
     screen_output=$(screen -ls 2>&1 || true)
 
-    echo "====================================================="
-    echo "               Active Screen Sessions"
-    echo "====================================================="
+    echo "==============================="
+    echo "        Active Screens"
+    echo "==============================="
 
     local count=0
     local rows=()
-    local re_full='^[[:space:]]*([0-9]+)\.([^[:space:]]+)[[:space:]]+\(([^)]+)\)[[:space:]]+\(([^)]+)\)'
-    local re_short='^[[:space:]]*([0-9]+)\.([^[:space:]]+)[[:space:]]+\(([^)]+)\)'
+    local re_sock='^[[:space:]]*([0-9]+)\.([^[:space:]]+)'
 
     while IFS= read -r line; do
-        if [[ "$line" =~ $re_full ]]; then
+        if [[ "$line" =~ $re_sock ]]; then
             local pid="${BASH_REMATCH[1]}"
             local name="${BASH_REMATCH[2]}"
-            local date="${BASH_REMATCH[3]}"
-            local status="${BASH_REMATCH[4]}"
-            rows+=("$(printf " %-8s %-18s %-12s %s" "$pid" "$name" "$status" "$date")")
-            ((count++))
-        elif [[ "$line" =~ $re_short ]]; then
-            local pid="${BASH_REMATCH[1]}"
-            local name="${BASH_REMATCH[2]}"
-            local status="${BASH_REMATCH[3]}"
-            rows+=("$(printf " %-8s %-18s %-12s %s" "$pid" "$name" "$status" "-")")
+            rows+=("$(printf " %-8s %s" "$pid" "$name")")
             ((count++))
         fi
     done <<< "$screen_output"
 
     if [ "$count" -eq 0 ]; then
-        echo " No active screen sessions found."
+        echo " No active screens found."
     else
-        printf " %-8s %-18s %-12s %s\n" "PID" "SESSION NAME" "STATUS" "STARTED"
-        echo "-----------------------------------------------------"
+        printf " %-8s %s\n" "PID" "NAME"
+        echo "-------------------------------"
         for r in "${rows[@]}"; do
             echo "$r"
         done
-        echo "-----------------------------------------------------"
-        echo " Total: $count active session(s)"
     fi
-    echo "====================================================="
+    echo "==============================="
     echo ""
 }
 
