@@ -37,6 +37,7 @@ while true; do
         2)
             bash scripts/updates.sh
             MSG="All system packages updated successfully."
+            exec bash "$0" "$MSG"
             ;;
         3)
             bash scripts/install.sh
