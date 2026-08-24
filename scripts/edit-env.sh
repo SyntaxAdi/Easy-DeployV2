@@ -5,8 +5,8 @@ set -e
 SCRIPT_DIR_EDIT_ENV="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR_EDIT_ENV/config.sh"
 source "$SCRIPT_DIR_EDIT_ENV/mongo.sh"
-source "$SCRIPT_DIR_EDIT_ENV/env_parser.sh"
-source "$SCRIPT_DIR_EDIT_ENV/env_process_manager.sh"
+source "$SCRIPT_DIR_EDIT_ENV/env_modifier.sh"
+source "$SCRIPT_DIR_EDIT_ENV/process_manager.sh"
 
 edit_env_variables() {
     load_env
