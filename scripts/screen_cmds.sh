@@ -109,7 +109,7 @@ connect_screen() {
     clear
     echo "Connecting to screen session '$chosen_screen'..."
     echo "(Press Ctrl+A followed by D to detach)"
-    sleep 1
+    sleep 3
     screen -r "$chosen_screen" || screen -x "$chosen_screen" || true
     clear
 }
