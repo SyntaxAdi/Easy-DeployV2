@@ -1,8 +1,17 @@
 import os
 import sys
+import site
 import importlib
 import traceback
 from time import sleep
+
+# Ensure user site packages directory is included in sys.path
+try:
+    user_site = site.getusersitepackages()
+    if user_site and user_site not in sys.path:
+        site.addsitedir(user_site)
+except Exception:
+    pass
 
 EasyDeploy = r"""
 ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
@@ -61,6 +70,12 @@ def telethon_session():
     except ImportError:
         print("Installing Telethon...")
         os.system(f"{sys.executable} -m pip install -U telethon --break-system-packages")
+        try:
+            user_site = site.getusersitepackages()
+            if user_site and user_site not in sys.path:
+                site.addsitedir(user_site)
+        except Exception:
+            pass
         importlib.invalidate_caches()
         import telethon
         x = "\bDone. Installed and imported Telethon."
@@ -114,6 +129,12 @@ def pyro_session():
     except ImportError:
         print("Installing Pyrogram...")
         os.system(f"{sys.executable} -m pip install pyrogram tgcrypto --break-system-packages")
+        try:
+            user_site = site.getusersitepackages()
+            if user_site and user_site not in sys.path:
+                site.addsitedir(user_site)
+        except Exception:
+            pass
         importlib.invalidate_caches()
         from pyrogram import Client
         x = "\bDone. Installed and imported Pyrogram."
