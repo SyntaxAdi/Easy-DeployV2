@@ -22,7 +22,8 @@ show_menu() {
     echo "8) Generate string session"
     echo "9) Screen cmds"
     echo "10) Delete 1-Click Deploy"
-    echo "11) Exit"
+    echo "11) Install AntiGravity CLI"
+    echo "12) Exit"
     echo "==============================="
 }
 
@@ -84,6 +85,11 @@ while true; do
             bash scripts/delete-one-click.sh
             ;;
         11)
+            bash scripts/install_antigravity.sh
+            MSG="AntiGravity CLI installed successfully."
+            exec bash "$0" "$MSG"
+            ;;
+        12)
             echo "Bye!"
             exit 0
             ;;
