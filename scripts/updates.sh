@@ -2,8 +2,13 @@
 
 set -e
 
+SUDO=""
+if command -v sudo &>/dev/null && [ "$(id -u)" -ne 0 ]; then
+    SUDO="sudo"
+fi
+
 echo "[+] Updating system package index..."
-sudo apt update
+$SUDO apt update
 
 echo "[+] Upgrading system packages..."
-sudo apt upgrade -y
+$SUDO apt upgrade -y
