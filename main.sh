@@ -85,8 +85,7 @@ while true; do
             bash scripts/delete-one-click.sh
             ;;
         11)
-            bash scripts/install_antigravity.sh
-            MSG="AntiGravity CLI installed successfully."
+            MSG=$(bash scripts/install_antigravity.sh | tail -n 1)
             exec bash "$0" "$MSG"
             ;;
         12)
