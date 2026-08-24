@@ -22,7 +22,7 @@ show_menu() {
     echo "==============================="
 }
 
-MSG=""
+MSG="${1:-}"
 
 while true; do
     show_menu "$MSG"
@@ -31,8 +31,8 @@ while true; do
 
     case "$choice" in
         1)
-            bash scripts/self-update.sh
-            exec bash "$0"
+            MSG=$(bash scripts/self-update.sh)
+            exec bash "$0" "$MSG"
             ;;
         2)
             bash scripts/updates.sh
