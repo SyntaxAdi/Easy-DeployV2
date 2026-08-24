@@ -20,7 +20,8 @@ show_menu() {
     echo "6) One-click Deploy"
     echo "7) Edit Env Variables"
     echo "8) Generate string session"
-    echo "9) Exit"
+    echo "9) Screen cmds"
+    echo "10) Exit"
     echo "==============================="
 }
 
@@ -76,6 +77,9 @@ while true; do
             python3 scripts/session.py
             ;;
         9)
+            bash scripts/screen_cmds.sh
+            ;;
+        10)
             echo "Bye!"
             exit 0
             ;;
