@@ -1,4 +1,7 @@
 import os
+import sys
+import importlib
+import traceback
 from time import sleep
 
 EasyDeploy = r"""
@@ -25,8 +28,15 @@ def clear_screen():
     if os.name == "posix":
         os.system("clear")
     else:
-        # for windows platfrom
+        # for windows platform
         os.system("cls")
+
+
+def stop_with_error(msg):
+    print(f"\n[!] {msg}")
+    input("\nPress Enter to continue...")
+    clear_screen()
+    exit(1)
 
 
 def get_api_id_and_hash():
@@ -36,9 +46,10 @@ def get_api_id_and_hash():
     try:
         API_ID = int(input("Please enter your API ID: "))
     except ValueError:
-        print("APP ID must be an integer.\nQuitting...")
-        exit(0)
-    API_HASH = input("Please enter your API HASH: ")
+        stop_with_error("APP ID must be an integer.")
+    API_HASH = input("Please enter your API HASH: ").strip()
+    if not API_HASH:
+        stop_with_error("API HASH must not be empty.")
     return API_ID, API_HASH
 
 
@@ -49,9 +60,11 @@ def telethon_session():
         x = "\bFound an existing installation of Telethon...\nSuccessfully Imported.\n\n"
     except ImportError:
         print("Installing Telethon...")
-        os.system("pip3 uninstall telethon -y && pip3 install -U telethon --break-system-packages")
-
+        os.system(f"{sys.executable} -m pip install -U telethon --break-system-packages")
+        importlib.invalidate_caches()
+        import telethon
         x = "\bDone. Installed and imported Telethon."
+
     clear_screen()
     print(EasyDeploy)
     print(x)
@@ -83,34 +96,28 @@ def telethon_session():
                 print(f"Here is That!\n{client.session.save()}\n\n")
                 print("NOTE: You can't use that as User Session..")
     except ApiIdInvalidError:
-        print(
-            "Your API ID/API HASH combination is invalid. Kindly recheck.\nQuitting..."
-        )
-        exit(0)
+        stop_with_error("Your API ID/API HASH combination is invalid. Kindly recheck.")
     except ValueError:
-        print("API HASH must not be empty!\nQuitting...")
-        exit(0)
+        stop_with_error("API HASH must not be empty.")
     except PhoneNumberInvalidError:
-        print("The phone number is invalid!\nQuitting...")
-        exit(0)
+        stop_with_error("The phone number is invalid.")
     except Exception as er:
-        print("Unexpected Error Occurred while Creating Session")
-        print(er)
-        print("If you think It as a Bug, Report to support.\n\n")
+        traceback.print_exc()
+        stop_with_error(f"Unexpected Error Occurred while Creating Session:\n{er}")
 
 
 def pyro_session():
     try:
         spinner("pyro")
         from pyrogram import Client
-
         x = "\bFound an existing installation of Pyrogram...\nSuccessfully Imported.\n\n"
-    except BaseException:
+    except ImportError:
         print("Installing Pyrogram...")
-        os.system("pip3 install pyrogram tgcrypto --break-system-packages")
-        x = "\bDone. Installed and imported Pyrogram."
+        os.system(f"{sys.executable} -m pip install pyrogram tgcrypto --break-system-packages")
+        importlib.invalidate_caches()
         from pyrogram import Client
-        
+        x = "\bDone. Installed and imported Pyrogram."
+
     clear_screen()
     print(EasyDeploy)
     print(x)
@@ -128,8 +135,8 @@ def pyro_session():
             print("Session has been sent to your saved messages!")
             return
     except Exception as er:
-      print("Unexpected error occurred while creating session, make sure to validate your inputs.")
-      print(er)
+        traceback.print_exc()
+        stop_with_error(f"Unexpected error occurred while creating session:\n{er}")
 
 
 def main():
@@ -142,15 +149,15 @@ def main():
             )
         )
     except Exception as e:
-        print(e)
-        clear_screen()
-        exit(0)
+        stop_with_error(f"Invalid input: {e}")
+
     if type_of_ss == 1:
         telethon_session()
     elif type_of_ss == 2:
         pyro_session()
     else:
-        print("Invalid choice.")
+        stop_with_error("Invalid choice entered.")
+
     x = input("\nRun again? (Y/n): ")
     if x.lower() in ["y", "yes"]:
         main()
@@ -159,4 +166,14 @@ def main():
         exit(0)
 
 
-main()
+if __name__ == "__main__":
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("\n\n[!] Process interrupted by user.")
+        input("\nPress Enter to continue...")
+        clear_screen()
+        exit(0)
+    except Exception as e:
+        traceback.print_exc()
+        stop_with_error(f"Unhandled error: {e}")
