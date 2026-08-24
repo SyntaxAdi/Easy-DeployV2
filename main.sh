@@ -1,29 +1,10 @@
 #!/bin/bash
 
-get_versions_msg() {
-    local git_v python_v pip_v ffmpeg_v jq_v fzf_v mongosh_v
-    git_v=$(git --version 2>/dev/null || echo "git: not installed")
-    python_v=$(python3 --version 2>/dev/null || echo "python3: not installed")
-    pip_v=$(pip3 --version 2>/dev/null || echo "pip3: not installed")
-    ffmpeg_v=$(ffmpeg -version 2>/dev/null | head -n 1 || echo "ffmpeg: not installed")
-    jq_v=$(jq --version 2>/dev/null | head -n 1 || echo "jq: not installed")
-    fzf_v=$(fzf --version 2>/dev/null || echo "fzf: not installed")
-    mongosh_v=$(mongosh --version 2>/dev/null | head -n 1 || echo "mongosh: not installed")
-
-    echo "=== Installed Versions ==="
-    echo "$git_v"
-    echo "$python_v"
-    echo "$pip_v"
-    echo "$ffmpeg_v"
-    echo "$jq_v"
-    echo "$fzf_v"
-    echo "$mongosh_v"
-    echo ""
-    echo "All dependencies installed successfully."
-}
-
 show_menu() {
-    clear
+    local should_clear="${2:-true}"
+    if [ "$should_clear" = "true" ]; then
+        clear
+    fi
     if [ -n "$1" ]; then
         echo "$1"
         echo ""
@@ -43,9 +24,11 @@ show_menu() {
 }
 
 MSG="${1:-}"
+CLEAR_MENU="true"
 
 while true; do
-    show_menu "$MSG"
+    show_menu "$MSG" "$CLEAR_MENU"
+    CLEAR_MENU="true"
     MSG=""
     read -rp "Choose an option: " choice
 
@@ -61,8 +44,19 @@ while true; do
             ;;
         3)
             bash scripts/install.sh
-            MSG=$(get_versions_msg)
-            exec bash "$0" "$MSG"
+            clear
+            echo "All dependencies installed successfully."
+            echo ""
+            echo "=== Installed Versions ==="
+            git --version 2>/dev/null || echo "git: not installed"
+            python3 --version 2>/dev/null || echo "python3: not installed"
+            pip3 --version 2>/dev/null || echo "pip3: not installed"
+            ffmpeg -version 2>/dev/null | head -n 1 || echo "ffmpeg: not installed"
+            jq --version 2>/dev/null | head -n 1 || echo "jq: not installed"
+            fzf --version 2>/dev/null || echo "fzf: not installed"
+            mongosh --version 2>/dev/null | head -n 1 || echo "mongosh: not installed"
+            echo ""
+            CLEAR_MENU="false"
             ;;
         4)
             bash scripts/setup-env.sh
