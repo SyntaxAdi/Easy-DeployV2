@@ -5,6 +5,54 @@ set -e
 SCRIPT_DIR_EDIT_ENV="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR_EDIT_ENV/config.sh"
 source "$SCRIPT_DIR_EDIT_ENV/mongo.sh"
+source "$SCRIPT_DIR_EDIT_ENV/screen_manager.sh"
+
+apply_env_updates() {
+    local target_path="$1"
+    local repo_name="$2"
+    local env_file="$3"
+    local env_content="$4"
+    local repo_json="$5"
+
+    # Save to MongoDB
+    update_repo_env_file_in_mongo "$MONGODB_URL" "$repo_name" "$env_file" "$env_content"
+
+    local screen_name
+    local start_cmd
+    local venv_cmd
+    screen_name=$(echo "$repo_json" | jq -r '.screen_name // ""')
+    start_cmd=$(echo "$repo_json" | jq -r '.start_cmd // ""')
+    venv_cmd=$(echo "$repo_json" | jq -r '.venv_cmd // ""')
+
+    local was_running=0
+    if [ -n "$screen_name" ] && [ "$screen_name" != "null" ]; then
+        if screen -list | grep -q "\.${screen_name}"; then
+            was_running=1
+        fi
+    fi
+
+    if [ "$was_running" -eq 1 ]; then
+        echo "Process screen session '$screen_name' is running. Stopping it..."
+        screen -S "$screen_name" -X quit || true
+        sleep 1
+    fi
+
+    # Update env file directly
+    if [ -d "$target_path" ] && [ -n "$env_file" ] && [ "$env_file" != "null" ]; then
+        echo -n "$env_content" > "$target_path/$env_file"
+        echo "Updated local env file at $target_path/$env_file."
+    fi
+
+    if [ "$was_running" -eq 1 ] && [ -n "$start_cmd" ] && [ "$start_cmd" != "null" ]; then
+        echo "Restarting process in screen..."
+        local has_venv="false"
+        if [ -n "$venv_cmd" ] && [ "$venv_cmd" != "null" ]; then
+            has_venv="true"
+        fi
+        run_screen_session "$target_path" "$screen_name" "$start_cmd" "$has_venv"
+    fi
+}
+
 edit_env_variables() {
     load_env
     if [ -z "$MONGODB_URL" ]; then
@@ -76,6 +124,9 @@ $raw_list"
         env_file=".env"
     fi
 
+    local target_path
+    target_path=$(echo "$repo_json" | jq -r '.target_path // ""')
+
     while true; do
         local clean_content
         clean_content=$(echo "$env_content" | tr -d '\r')
@@ -110,12 +161,7 @@ $raw_list"
                         env_content="${env_content}
 ${new_key}=${new_val}"
                     fi
-                    update_repo_env_file_in_mongo "$MONGODB_URL" "$repo_name" "$env_file" "$env_content"
-                    local target_path
-                    target_path=$(echo "$repo_json" | jq -r '.target_path // ""')
-                    if [ -d "$target_path" ]; then
-                        echo -n "$env_content" > "$target_path/$env_file"
-                    fi
+                    apply_env_updates "$target_path" "$repo_name" "$env_file" "$env_content" "$repo_json"
                     echo "Variable added."
                 fi
             else
@@ -147,12 +193,7 @@ ${new_key}=${new_val}"
                     new_key=$(echo "$new_key" | xargs)
                     env_content="${env_content}
 ${new_key}=${new_val}"
-                    update_repo_env_file_in_mongo "$MONGODB_URL" "$repo_name" "$env_file" "$env_content"
-                    local target_path
-                    target_path=$(echo "$repo_json" | jq -r '.target_path // ""')
-                    if [ -d "$target_path" ]; then
-                        echo -n "$env_content" > "$target_path/$env_file"
-                    fi
+                    apply_env_updates "$target_path" "$repo_name" "$env_file" "$env_content" "$repo_json"
                 fi
                 continue
             fi
@@ -174,12 +215,7 @@ ${new_key}=${new_val}"
                     new_key=$(echo "$new_key" | xargs)
                     env_content="${env_content}
 ${new_key}=${new_val}"
-                    update_repo_env_file_in_mongo "$MONGODB_URL" "$repo_name" "$env_file" "$env_content"
-                    local target_path
-                    target_path=$(echo "$repo_json" | jq -r '.target_path // ""')
-                    if [ -d "$target_path" ]; then
-                        echo -n "$env_content" > "$target_path/$env_file"
-                    fi
+                    apply_env_updates "$target_path" "$repo_name" "$env_file" "$env_content" "$repo_json"
                 fi
                 continue
             elif [ "$var_choice" -eq "$((i+1))" ] || [ -z "$var_choice" ]; then
@@ -211,7 +247,6 @@ ${new_key}=${new_val}"
                     val_map["$selected_key"]="$new_val"
                     
                     local old_selected_key="$selected_key"
-                    local action="modify"
                     
                     local new_content=""
                     local cleaned_input
@@ -259,12 +294,7 @@ ${line}"
                     done <<< "$cleaned_input"
 
                     env_content="$new_content"
-                    update_repo_env_file_in_mongo "$MONGODB_URL" "$repo_name" "$env_file" "$env_content"
-                    local target_path
-                    target_path=$(echo "$repo_json" | jq -r '.target_path // ""')
-                    if [ -d "$target_path" ] && [ -n "$env_file" ] && [ "$env_file" != "null" ]; then
-                        echo -n "$env_content" > "$target_path/$env_file"
-                    fi
+                    apply_env_updates "$target_path" "$repo_name" "$env_file" "$env_content" "$repo_json"
 
                     echo "Value updated."
                     break
@@ -279,7 +309,6 @@ ${line}"
                         
                         local old_selected_key="$selected_key"
                         local new_key_name="$new_name"
-                        local action="rename"
                         
                         local new_content=""
                         local cleaned_input
@@ -327,12 +356,7 @@ ${line}"
                         done <<< "$cleaned_input"
 
                         env_content="$new_content"
-                        update_repo_env_file_in_mongo "$MONGODB_URL" "$repo_name" "$env_file" "$env_content"
-                        local target_path
-                        target_path=$(echo "$repo_json" | jq -r '.target_path // ""')
-                        if [ -d "$target_path" ] && [ -n "$env_file" ] && [ "$env_file" != "null" ]; then
-                            echo -n "$env_content" > "$target_path/$env_file"
-                        fi
+                        apply_env_updates "$target_path" "$repo_name" "$env_file" "$env_content" "$repo_json"
 
                         selected_key="$new_name"
                         echo "Name updated to $new_name."
@@ -343,7 +367,6 @@ ${line}"
                     unset val_map["$selected_key"]
                     
                     local old_selected_key="$selected_key"
-                    local action="delete"
                     
                     local new_content=""
                     local cleaned_input
@@ -352,7 +375,7 @@ ${line}"
                     while IFS= read -r line || [ -n "$line" ]; do
                         if [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]]; then
                             if [ -z "$new_content" ]; then
-                                new_content="$line"
+                                  new_content="$line"
                             else
                                 new_content="${new_content}
 ${line}"
@@ -385,12 +408,7 @@ ${line}"
                     done <<< "$cleaned_input"
 
                     env_content="$new_content"
-                    update_repo_env_file_in_mongo "$MONGODB_URL" "$repo_name" "$env_file" "$env_content"
-                    local target_path
-                    target_path=$(echo "$repo_json" | jq -r '.target_path // ""')
-                    if [ -d "$target_path" ] && [ -n "$env_file" ] && [ "$env_file" != "null" ]; then
-                        echo -n "$env_content" > "$target_path/$env_file"
-                    fi
+                    apply_env_updates "$target_path" "$repo_name" "$env_file" "$env_content" "$repo_json"
 
                     echo "Variable deleted."
                     break 2
