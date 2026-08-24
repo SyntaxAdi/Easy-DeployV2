@@ -47,17 +47,17 @@ while true; do
         3)
             bash scripts/install.sh
             clear
-            echo "All dependencies installed successfully."
-            echo ""
-            echo "=== Installed Versions ==="
-            git --version 2>/dev/null || echo "git: not installed"
-            python3 --version 2>/dev/null || echo "python3: not installed"
-            pip3 --version 2>/dev/null || echo "pip3: not installed"
-            ffmpeg -version 2>/dev/null | head -n 1 || echo "ffmpeg: not installed"
-            jq --version 2>/dev/null | head -n 1 || echo "jq: not installed"
-            fzf --version 2>/dev/null || echo "fzf: not installed"
-            mongosh --version 2>/dev/null | head -n 1 || echo "mongosh: not installed"
-            echo ""
+            echo "==============================="
+            echo "       Installed Versions"
+            echo "==============================="
+            if command -v git &>/dev/null; then git --version; else echo "git: not installed"; fi
+            if command -v python3 &>/dev/null; then python3 --version; else echo "python3: not installed"; fi
+            if command -v pip3 &>/dev/null; then pip3 --version; elif python3 -m pip --version &>/dev/null; then python3 -m pip --version; else echo "pip3: not installed"; fi
+            if command -v ffmpeg &>/dev/null; then ffmpeg -version 2>/dev/null | head -n 1; else echo "ffmpeg: not installed"; fi
+            if command -v jq &>/dev/null; then jq --version; else echo "jq: not installed"; fi
+            if command -v fzf &>/dev/null; then fzf --version 2>/dev/null | head -n 1; else echo "fzf: not installed"; fi
+            if command -v mongosh &>/dev/null; then mongosh --version 2>/dev/null | head -n 1; else echo "mongosh: not installed"; fi
+            echo "==============================="
             CLEAR_MENU="false"
             ;;
         4)
