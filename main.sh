@@ -19,7 +19,8 @@ show_menu() {
     echo "5) Clone a repo"
     echo "6) One-click Deploy"
     echo "7) Edit Env Variables"
-    echo "8) Exit"
+    echo "8) Generate string session"
+    echo "9) Exit"
     echo "==============================="
 }
 
@@ -72,6 +73,9 @@ while true; do
             bash scripts/edit-env.sh
             ;;
         8)
+            python3 scripts/session.py
+            ;;
+        9)
             echo "Bye!"
             exit 0
             ;;
