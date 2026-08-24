@@ -5,53 +5,8 @@ set -e
 SCRIPT_DIR_EDIT_ENV="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR_EDIT_ENV/config.sh"
 source "$SCRIPT_DIR_EDIT_ENV/mongo.sh"
-source "$SCRIPT_DIR_EDIT_ENV/screen_manager.sh"
-
-apply_env_updates() {
-    local target_path="$1"
-    local repo_name="$2"
-    local env_file="$3"
-    local env_content="$4"
-    local repo_json="$5"
-
-    # Save to MongoDB
-    update_repo_env_file_in_mongo "$MONGODB_URL" "$repo_name" "$env_file" "$env_content"
-
-    local screen_name
-    local start_cmd
-    local venv_cmd
-    screen_name=$(echo "$repo_json" | jq -r '.screen_name // ""')
-    start_cmd=$(echo "$repo_json" | jq -r '.start_cmd // ""')
-    venv_cmd=$(echo "$repo_json" | jq -r '.venv_cmd // ""')
-
-    local was_running=0
-    if [ -n "$screen_name" ] && [ "$screen_name" != "null" ]; then
-        if screen -list | grep -q "\.${screen_name}"; then
-            was_running=1
-        fi
-    fi
-
-    if [ "$was_running" -eq 1 ]; then
-        echo "Process screen session '$screen_name' is running. Stopping it..."
-        screen -S "$screen_name" -X quit || true
-        sleep 1
-    fi
-
-    # Update env file directly
-    if [ -d "$target_path" ] && [ -n "$env_file" ] && [ "$env_file" != "null" ]; then
-        echo -n "$env_content" > "$target_path/$env_file"
-        echo "Updated local env file at $target_path/$env_file."
-    fi
-
-    if [ "$was_running" -eq 1 ] && [ -n "$start_cmd" ] && [ "$start_cmd" != "null" ]; then
-        echo "Restarting process in screen..."
-        local has_venv="false"
-        if [ -n "$venv_cmd" ] && [ "$venv_cmd" != "null" ]; then
-            has_venv="true"
-        fi
-        run_screen_session "$target_path" "$screen_name" "$start_cmd" "$has_venv"
-    fi
-}
+source "$SCRIPT_DIR_EDIT_ENV/env_parser.sh"
+source "$SCRIPT_DIR_EDIT_ENV/env_process_manager.sh"
 
 edit_env_variables() {
     load_env
@@ -244,58 +199,8 @@ ${new_key}=${new_val}"
                 1)
                     read -rp "Enter new value (press Enter to keep current): " new_val
                     new_val="${new_val:-$current_val}"
-                    val_map["$selected_key"]="$new_val"
-                    
-                    local old_selected_key="$selected_key"
-                    
-                    local new_content=""
-                    local cleaned_input
-                    cleaned_input=$(echo "$env_content" | tr -d '\r')
-
-                    while IFS= read -r line || [ -n "$line" ]; do
-                        if [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]]; then
-                            if [ -z "$new_content" ]; then
-                                new_content="$line"
-                            else
-                                new_content="${new_content}
-${line}"
-                            fi
-                            continue
-                        fi
-
-                        if [[ "$line" =~ = ]]; then
-                            local line_key="${line%%=*}"
-                            line_key=$(echo "$line_key" | xargs)
-                            
-                            if [ "$line_key" = "$old_selected_key" ]; then
-                                local updated_line="${selected_key}=${val_map[$selected_key]}"
-                                if [ -z "$new_content" ]; then
-                                    new_content="$updated_line"
-                                else
-                                    new_content="${new_content}
-${updated_line}"
-                                fi
-                            else
-                                if [ -z "$new_content" ]; then
-                                    new_content="$line"
-                                else
-                                    new_content="${new_content}
-${line}"
-                                fi
-                            fi
-                        else
-                            if [ -z "$new_content" ]; then
-                                new_content="$line"
-                            else
-                                new_content="${new_content}
-${line}"
-                            fi
-                        fi
-                    done <<< "$cleaned_input"
-
-                    env_content="$new_content"
+                    env_content=$(modify_env_var "$env_content" "$selected_key" "$new_val")
                     apply_env_updates "$target_path" "$repo_name" "$env_file" "$env_content" "$repo_json"
-
                     echo "Value updated."
                     break
                     ;;
@@ -303,113 +208,16 @@ ${line}"
                     read -rp "Enter new name: " new_name
                     if [ -n "$new_name" ]; then
                         new_name=$(echo "$new_name" | xargs)
-                        local old_val="${val_map[$selected_key]}"
-                        unset val_map["$selected_key"]
-                        val_map["$new_name"]="$old_val"
-                        
-                        local old_selected_key="$selected_key"
-                        local new_key_name="$new_name"
-                        
-                        local new_content=""
-                        local cleaned_input
-                        cleaned_input=$(echo "$env_content" | tr -d '\r')
-
-                        while IFS= read -r line || [ -n "$line" ]; do
-                            if [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]]; then
-                                if [ -z "$new_content" ]; then
-                                    new_content="$line"
-                                else
-                                    new_content="${new_content}
-${line}"
-                               fi
-                                continue
-                            fi
-
-                            if [[ "$line" =~ = ]]; then
-                                local line_key="${line%%=*}"
-                                line_key=$(echo "$line_key" | xargs)
-                                
-                                if [ "$line_key" = "$old_selected_key" ]; then
-                                    local updated_line="${new_key_name}=${val_map[$new_key_name]}"
-                                    if [ -z "$new_content" ]; then
-                                        new_content="$updated_line"
-                                    else
-                                        new_content="${new_content}
-${updated_line}"
-                                    fi
-                                else
-                                    if [ -z "$new_content" ]; then
-                                        new_content="$line"
-                                    else
-                                        new_content="${new_content}
-${line}"
-                                    fi
-                                fi
-                            else
-                                if [ -z "$new_content" ]; then
-                                    new_content="$line"
-                                else
-                                    new_content="${new_content}
-${line}"
-                                fi
-                            fi
-                        done <<< "$cleaned_input"
-
-                        env_content="$new_content"
+                        env_content=$(rename_env_var "$env_content" "$selected_key" "$new_name")
                         apply_env_updates "$target_path" "$repo_name" "$env_file" "$env_content" "$repo_json"
-
                         selected_key="$new_name"
                         echo "Name updated to $new_name."
                     fi
                     break
                     ;;
                 3)
-                    unset val_map["$selected_key"]
-                    
-                    local old_selected_key="$selected_key"
-                    
-                    local new_content=""
-                    local cleaned_input
-                    cleaned_input=$(echo "$env_content" | tr -d '\r')
-
-                    while IFS= read -r line || [ -n "$line" ]; do
-                        if [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]]; then
-                            if [ -z "$new_content" ]; then
-                                  new_content="$line"
-                            else
-                                new_content="${new_content}
-${line}"
-                            fi
-                            continue
-                        fi
-
-                        if [[ "$line" =~ = ]]; then
-                            local line_key="${line%%=*}"
-                            line_key=$(echo "$line_key" | xargs)
-                            
-                            if [ "$line_key" = "$old_selected_key" ]; then
-                                continue
-                            else
-                                if [ -z "$new_content" ]; then
-                                    new_content="$line"
-                                else
-                                    new_content="${new_content}
-${line}"
-                                fi
-                            fi
-                        else
-                            if [ -z "$new_content" ]; then
-                                new_content="$line"
-                            else
-                                new_content="${new_content}
-${line}"
-                            fi
-                        fi
-                    done <<< "$cleaned_input"
-
-                    env_content="$new_content"
+                    env_content=$(delete_env_var "$env_content" "$selected_key")
                     apply_env_updates "$target_path" "$repo_name" "$env_file" "$env_content" "$repo_json"
-
                     echo "Variable deleted."
                     break 2
                     ;;
