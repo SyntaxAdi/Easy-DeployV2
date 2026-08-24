@@ -51,20 +51,3 @@ else
     sudo dpkg -i /tmp/mongosh.deb
     rm /tmp/mongosh.deb
 fi
-
-clear
-
-echo ""
-echo "=== Installed Versions ==="
-git --version
-python3 --version
-pip3 --version
-ffmpeg -version | head -n 1
-jq --version
-fzf --version
-mongosh --version
-echo ""
-echo "All dependencies installed successfully."
-
-echo ""
-read -rp "Press Enter to return to main menu..."
