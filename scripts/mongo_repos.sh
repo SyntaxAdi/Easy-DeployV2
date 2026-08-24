@@ -211,3 +211,26 @@ fetch_repo_details_from_mongo() {
     fi
     echo "$output"
 }
+
+delete_repo_from_mongo() {
+    local mongo_url="$1"
+    local repo_name="$2"
+    if [ -z "$mongo_url" ] || [ -z "$repo_name" ]; then
+        return 1
+    fi
+
+    local escaped_repo_name
+    escaped_repo_name=$(escape_mongo_str "$repo_name")
+
+    local output
+    local exit_code=0
+    output=$(mongosh "$mongo_url" --quiet --eval "
+        const d = db.getSiblingDB('deploy');
+        d.repos.deleteOne({ repo_name: '$escaped_repo_name' });
+    " 2>&1) || exit_code=$?
+
+    if [ $exit_code -ne 0 ]; then
+        echo "MongoDB error deleting repo: $output" >&2
+        return 1
+    fi
+}

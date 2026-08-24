@@ -21,7 +21,8 @@ show_menu() {
     echo "7) Edit Env Variables"
     echo "8) Generate string session"
     echo "9) Screen cmds"
-    echo "10) Exit"
+    echo "10) Delete 1-Click Deploy"
+    echo "11) Exit"
     echo "==============================="
 }
 
@@ -80,6 +81,9 @@ while true; do
             bash scripts/screen_cmds.sh
             ;;
         10)
+            bash scripts/delete-one-click.sh
+            ;;
+        11)
             echo "Bye!"
             exit 0
             ;;
