@@ -2,8 +2,8 @@
 
 set -e
 
-[ -n "$_ENV_PARSER_SH_LOADED" ] && return 0
-_ENV_PARSER_SH_LOADED=1
+[ -n "$_ENV_MODIFIER_SH_LOADED" ] && return 0
+_ENV_MODIFIER_SH_LOADED=1
 
 modify_env_var() {
     local content="$1"
