@@ -69,7 +69,7 @@ def telethon_session():
         x = "\bFound an existing installation of Telethon...\nSuccessfully Imported.\n\n"
     except ImportError:
         print("Installing Telethon...")
-        os.system(f"{sys.executable} -m pip install -U telethon --break-system-packages")
+        os.system("pip3 install -U telethon --break-system-packages")
         try:
             user_site = site.getusersitepackages()
             if user_site and user_site not in sys.path:
@@ -128,7 +128,7 @@ def pyro_session():
         x = "\bFound an existing installation of Pyrogram...\nSuccessfully Imported.\n\n"
     except ImportError:
         print("Installing Pyrogram...")
-        os.system(f"{sys.executable} -m pip install pyrogram tgcrypto --break-system-packages")
+        os.system("pip3 install pyrogram tgcrypto --break-system-packages")
         try:
             user_site = site.getusersitepackages()
             if user_site and user_site not in sys.path:
