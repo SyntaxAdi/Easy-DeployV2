@@ -65,3 +65,6 @@ fzf --version
 mongosh --version
 echo ""
 echo "All dependencies installed successfully."
+
+echo ""
+read -rp "Press Enter to return to main menu..."
