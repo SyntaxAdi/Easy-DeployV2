@@ -49,7 +49,7 @@ def telethon_session():
         x = "\bFound an existing installation of Telethon...\nSuccessfully Imported.\n\n"
     except ImportError:
         print("Installing Telethon...")
-        os.system("pip3 uninstall telethon -y && pip3 install -U telethon")
+        os.system("pip3 uninstall telethon -y && pip3 install -U telethon --break-system-packages")
 
         x = "\bDone. Installed and imported Telethon."
     clear_screen()
@@ -107,7 +107,7 @@ def pyro_session():
         x = "\bFound an existing installation of Pyrogram...\nSuccessfully Imported.\n\n"
     except BaseException:
         print("Installing Pyrogram...")
-        os.system("pip3 install pyrogram tgcrypto")
+        os.system("pip3 install pyrogram tgcrypto --break-system-packages")
         x = "\bDone. Installed and imported Pyrogram."
         from pyrogram import Client
         
