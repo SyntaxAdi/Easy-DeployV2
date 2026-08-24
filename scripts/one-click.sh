@@ -56,11 +56,12 @@ one_click_deploy() {
         return 1
     fi
 
-    local repo_url venv_cmd install_cmd extra_install_cmd env_file env_content screen_name start_cmd
+    local repo_url venv_cmd install_cmd extra_install_cmd apt_cmd env_file env_content screen_name start_cmd
     repo_url=$(echo "$repo_json" | jq -r '.repo_url // ""')
     venv_cmd=$(echo "$repo_json" | jq -r '.venv_cmd // ""')
     install_cmd=$(echo "$repo_json" | jq -r '.install_cmd // ""')
     extra_install_cmd=$(echo "$repo_json" | jq -r '.extra_install_cmd // ""')
+    apt_cmd=$(echo "$repo_json" | jq -r '.apt_cmd // ""')
     env_file=$(echo "$repo_json" | jq -r '.env_file // ""')
     env_content=$(echo "$repo_json" | jq -r '.env_content // ""')
     screen_name=$(echo "$repo_json" | jq -r '.screen_name // ""')
@@ -75,6 +76,13 @@ one_click_deploy() {
 
     echo "Step 1: Syncing repository..."
     git_sync_repo "$repo_url" "$target"
+
+    if [ -n "$apt_cmd" ] && [ "$apt_cmd" != "null" ]; then
+        echo ""
+        echo "Step: Installing system apt packages..."
+        echo "Running: $apt_cmd"
+        eval "$apt_cmd" || echo "Warning: Some apt packages failed to install." >&2
+    fi
 
     if [ -n "$venv_cmd" ] && [ "$venv_cmd" != "null" ]; then
         echo ""

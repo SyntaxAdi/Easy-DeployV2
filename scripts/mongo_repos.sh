@@ -51,6 +51,7 @@ update_repo_commands_in_mongo() {
     local venv_cmd="$3"
     local install_cmd="$4"
     local extra_install_cmd="$5"
+    local apt_cmd="$6"
 
     if [ -z "$mongo_url" ]; then
         return
@@ -60,11 +61,13 @@ update_repo_commands_in_mongo() {
     local escaped_venv_cmd
     local escaped_install_cmd
     local escaped_extra_install_cmd
+    local escaped_apt_cmd
 
     escaped_repo_name=$(escape_mongo_str "$repo_name")
     escaped_venv_cmd=$(escape_mongo_str "$venv_cmd")
     escaped_install_cmd=$(escape_mongo_str "$install_cmd")
     escaped_extra_install_cmd=$(escape_mongo_str "$extra_install_cmd")
+    escaped_apt_cmd=$(escape_mongo_str "$apt_cmd")
 
     local output
     local exit_code=0
@@ -73,7 +76,7 @@ update_repo_commands_in_mongo() {
         const d = db.getSiblingDB('deploy');
         d.repos.updateOne(
             { repo_name: '$escaped_repo_name' },
-            { \$set: { venv_cmd: '$escaped_venv_cmd', install_cmd: '$escaped_install_cmd', extra_install_cmd: '$escaped_extra_install_cmd', updated_at: new Date() } }
+            { \$set: { venv_cmd: '$escaped_venv_cmd', install_cmd: '$escaped_install_cmd', extra_install_cmd: '$escaped_extra_install_cmd', apt_cmd: '$escaped_apt_cmd', updated_at: new Date() } }
         );
     " 2>&1) || exit_code=$?
 

@@ -11,6 +11,27 @@ source "$SCRIPT_DIR_INSTALL_DEPS/mongo.sh"
 source "$SCRIPT_DIR_INSTALL_DEPS/setup_project_env.sh"
 source "$SCRIPT_DIR_INSTALL_DEPS/screen_manager.sh"
 
+normalize_apt_command() {
+    local raw_input="$1"
+    [ -z "$raw_input" ] && return 0
+
+    local SUDO=""
+    if command -v sudo &>/dev/null && [ "$(id -u)" -ne 0 ]; then
+        SUDO="sudo"
+    fi
+
+    local packages
+    packages=$(echo "$raw_input" | sed -E 's/\b(sudo|apt-get|apt|install|-y|-qq|--yes)\b//g' | xargs)
+
+    if [ -n "$packages" ]; then
+        if [ -n "$SUDO" ]; then
+            echo "$SUDO apt-get install -y $packages"
+        else
+            echo "apt-get install -y $packages"
+        fi
+    fi
+}
+
 install_project_dependencies() {
     local target="$1"
     local repo_name="$2"
@@ -23,6 +44,7 @@ install_project_dependencies() {
     case "$post_choice" in
         1)
             local setup_success=0
+            local apt_cmd=""
             read -rp "Is this a Python tech stack project? (y/n): " is_python
             if [[ "$is_python" =~ ^[Yy]$ ]]; then
                 local venv_cmd="python3 -m venv venv"
@@ -42,10 +64,20 @@ install_project_dependencies() {
                             fi
                         fi
 
+                        read -rp "Are there any additional apt packages to install? (y/n): " has_apt_pkgs
+                        if [[ "$has_apt_pkgs" =~ ^[Yy]$ ]]; then
+                            read -rp "Enter package name(s) or install command: " raw_apt_input
+                            apt_cmd=$(normalize_apt_command "$raw_apt_input")
+                            if [ -n "$apt_cmd" ]; then
+                                echo "Installing system packages: $apt_cmd..."
+                                eval "$apt_cmd" || echo "Warning: Some apt packages could not be installed." >&2
+                            fi
+                        fi
+
                         load_env
                         if [ -n "$MONGODB_URL" ] && [ -n "$repo_name" ]; then
-                            if update_repo_commands_in_mongo "$MONGODB_URL" "$repo_name" "$venv_cmd" "$install_cmd" "$extra_cmd"; then
-                                echo "Saved python setup/install commands to MongoDB."
+                            if update_repo_commands_in_mongo "$MONGODB_URL" "$repo_name" "$venv_cmd" "$install_cmd" "$extra_cmd" "$apt_cmd"; then
+                                echo "Saved setup/install commands to MongoDB."
                             else
                                 echo "Warning: Failed to save setup commands to MongoDB." >&2
                             fi
@@ -62,18 +94,31 @@ install_project_dependencies() {
                 if [ -n "$install_cmd" ]; then
                     echo "Executing: $install_cmd inside $target..."
                     if (cd "$target" && eval "$install_cmd"); then
-                        load_env
-                        if [ -n "$MONGODB_URL" ] && [ -n "$repo_name" ]; then
-                            if update_repo_commands_in_mongo "$MONGODB_URL" "$repo_name" "" "$install_cmd" ""; then
-                                echo "Saved install command to MongoDB."
-                            else
-                                echo "Warning: Failed to save install command to MongoDB." >&2
-                            fi
-                        fi
                         setup_success=1
                     fi
                 else
                     setup_success=1
+                fi
+
+                read -rp "Are there any additional apt packages to install? (y/n): " has_apt_pkgs
+                if [[ "$has_apt_pkgs" =~ ^[Yy]$ ]]; then
+                    read -rp "Enter package name(s) or install command: " raw_apt_input
+                    apt_cmd=$(normalize_apt_command "$raw_apt_input")
+                    if [ -n "$apt_cmd" ]; then
+                        echo "Installing system packages: $apt_cmd..."
+                        eval "$apt_cmd" || echo "Warning: Some apt packages could not be installed." >&2
+                    fi
+                fi
+
+                if [ "$setup_success" -eq 1 ]; then
+                    load_env
+                    if [ -n "$MONGODB_URL" ] && [ -n "$repo_name" ]; then
+                        if update_repo_commands_in_mongo "$MONGODB_URL" "$repo_name" "" "$install_cmd" "" "$apt_cmd"; then
+                            echo "Saved install command to MongoDB."
+                        else
+                            echo "Warning: Failed to save install command to MongoDB." >&2
+                        fi
+                    fi
                 fi
             fi
             
