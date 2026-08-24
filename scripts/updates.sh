@@ -7,6 +7,3 @@ sudo apt update
 
 echo "[+] Upgrading system packages..."
 sudo apt upgrade -y
-
-clear
-echo "Package update completed successfully."
