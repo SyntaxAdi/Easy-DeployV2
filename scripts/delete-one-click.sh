@@ -92,4 +92,3 @@ delete_repo_from_mongo "$MONGODB_URL" "$selected_repo_name"
 
 echo "Deleted '$selected_repo_name' successfully."
 read -rp "Press Enter to return to main menu..."
-clear

@@ -70,11 +70,10 @@ ${line}"
             done
             ;;
         2)
-            echo "Paste your env file content below (press Enter on empty line or type EOF to finish):"
+            echo "Paste your env file content below (type 'EOF' on a new line or press Ctrl+D to finish):"
             touch "$env_path"
-            while true; do
-                read -r line
-                if [ -z "$line" ] || [ "$line" = "EOF" ]; then
+            while IFS= read -r line || [ -n "$line" ]; do
+                if [ "$line" = "EOF" ]; then
                     break
                 fi
                 echo "$line" >> "$env_path"

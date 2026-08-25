@@ -131,9 +131,11 @@ install_project_dependencies() {
             ;;
     esac
 
-    clear
+    echo ""
+    read -rp "Press Enter to return to main menu..."
 }
 
 post_clone_actions() {
     install_project_dependencies "$@"
 }
+
