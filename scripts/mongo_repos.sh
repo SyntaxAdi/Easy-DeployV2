@@ -163,6 +163,45 @@ update_repo_screen_details_in_mongo() {
     fi
 }
 
+update_repo_field_in_mongo() {
+    local mongo_url="$1"
+    local repo_name="$2"
+    local field_name="$3"
+    local field_val="$4"
+
+    if [ -z "$mongo_url" ] || [ -z "$repo_name" ] || [ -z "$field_name" ]; then
+        return 1
+    fi
+
+    local escaped_repo_name
+    escaped_repo_name=$(escape_mongo_str "$repo_name")
+
+    local escaped_val
+    if command -v python3 &>/dev/null; then
+        escaped_val=$(echo -n "$field_val" | python3 -c 'import json, sys; print(json.dumps(sys.stdin.read()))')
+    else
+        local cleaned
+        cleaned=$(escape_mongo_str "$field_val")
+        escaped_val="'$cleaned'"
+    fi
+
+    local output
+    local exit_code=0
+
+    output=$(mongosh "$mongo_url" --quiet --eval "
+        const d = db.getSiblingDB('deploy');
+        d.repos.updateOne(
+            { repo_name: '$escaped_repo_name' },
+            { \$set: { '$field_name': $escaped_val, updated_at: new Date() } }
+        );
+    " 2>&1) || exit_code=$?
+
+    if [ $exit_code -ne 0 ]; then
+        echo "MongoDB error updating repo $field_name: $output" >&2
+        return 1
+    fi
+}
+
 fetch_repos_from_mongo() {
     local mongo_url="$1"
     if [ -z "$mongo_url" ]; then
