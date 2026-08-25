@@ -6,6 +6,7 @@ SCRIPT_DIR_EDIT_OC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR_EDIT_OC/config.sh"
 source "$SCRIPT_DIR_EDIT_OC/mongo.sh"
 source "$SCRIPT_DIR_EDIT_OC/setup_project_env.sh"
+source "$SCRIPT_DIR_EDIT_OC/install_deps.sh"
 
 edit_repo_field() {
     local repo_name="$1"
@@ -174,7 +175,15 @@ edit_one_click_repo() {
                 edit_repo_field "$repo_name" "repo_url" "Repository URL" "$repo_url"
                 ;;
             2)
-                edit_repo_field "$repo_name" "apt_cmd" "APT Command" "$apt_cmd"
+                echo ""
+                echo "Current APT Command: $apt_cmd"
+                read -rp "Enter package name(s) or install command (Enter to keep current): " raw_apt
+                if [ -n "$raw_apt" ]; then
+                    norm_apt=$(normalize_apt_command "$raw_apt")
+                    if update_repo_field_in_mongo "$MONGODB_URL" "$repo_name" "apt_cmd" "$norm_apt"; then
+                        echo "Updated APT Command: $norm_apt"
+                    fi
+                fi
                 ;;
             3)
                 edit_repo_field "$repo_name" "venv_cmd" "Venv Command" "$venv_cmd"

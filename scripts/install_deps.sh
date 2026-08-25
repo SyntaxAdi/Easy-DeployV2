@@ -15,20 +15,28 @@ normalize_apt_command() {
     local raw_input="$1"
     [ -z "$raw_input" ] && return 0
 
+    raw_input=$(echo "$raw_input" | xargs)
+    [ -z "$raw_input" ] && return 0
+
     local SUDO=""
     if command -v sudo &>/dev/null && [ "$(id -u)" -ne 0 ]; then
-        SUDO="sudo"
+        SUDO="sudo "
     fi
 
-    local packages
-    packages=$(echo "$raw_input" | sed -E 's/\b(sudo|apt-get|apt|install|-y|-qq|--yes)\b//g' | xargs)
-
-    if [ -n "$packages" ]; then
-        if [ -n "$SUDO" ]; then
-            echo "$SUDO apt-get install -y $packages"
-        else
-            echo "apt-get install -y $packages"
+    if [[ "$raw_input" =~ ^(sudo[[:space:]]+)?(apt-get|apt)([[:space:]]+.*)?$ ]]; then
+        local cmd="$raw_input"
+        
+        if [ -n "$SUDO" ] && [[ ! "$cmd" =~ ^sudo[[:space:]] ]]; then
+            cmd="sudo $cmd"
         fi
+
+        if [[ "$cmd" =~ [[:space:]]install([[:space:]]|$) ]] && [[ ! "$cmd" =~ [[:space:]](-y|-qq|--yes)([[:space:]]|$) ]]; then
+            cmd=$(echo "$cmd" | sed -E 's/([[:space:]]install)([[:space:]]|$)/\1 -y\2/')
+        fi
+
+        echo "$cmd"
+    else
+        echo "${SUDO}apt-get install -y $raw_input"
     fi
 }
 

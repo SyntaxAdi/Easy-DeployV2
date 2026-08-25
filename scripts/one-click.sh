@@ -9,6 +9,7 @@ source "$SCRIPT_DIR_OC/mongo.sh"
 source "$SCRIPT_DIR_OC/git.sh"
 source "$SCRIPT_DIR_OC/setup_project_env.sh"
 source "$SCRIPT_DIR_OC/screen_manager.sh"
+source "$SCRIPT_DIR_OC/install_deps.sh"
 
 one_click_deploy() {
     load_env
@@ -80,8 +81,11 @@ one_click_deploy() {
     if [ -n "$apt_cmd" ] && [ "$apt_cmd" != "null" ]; then
         echo ""
         echo "Step: Installing system apt packages..."
-        echo "Running: $apt_cmd"
-        eval "$apt_cmd" || echo "Warning: Some apt packages failed to install." >&2
+        local exec_apt_cmd
+        exec_apt_cmd=$(normalize_apt_command "$apt_cmd")
+        [ -z "$exec_apt_cmd" ] && exec_apt_cmd="$apt_cmd"
+        echo "Running: $exec_apt_cmd"
+        eval "$exec_apt_cmd" || echo "Warning: Some apt packages failed to install." >&2
     fi
 
     if [ -n "$venv_cmd" ] && [ "$venv_cmd" != "null" ]; then
