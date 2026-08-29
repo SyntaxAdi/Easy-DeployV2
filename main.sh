@@ -59,7 +59,7 @@ while true; do
             if command -v ffmpeg &>/dev/null; then ffmpeg -version 2>/dev/null | head -n 1; else echo "ffmpeg: not installed"; fi
             if command -v jq &>/dev/null; then jq --version; else echo "jq: not installed"; fi
             if command -v fzf &>/dev/null; then fzf --version 2>/dev/null | head -n 1; else echo "fzf: not installed"; fi
-            if command -v mongosh &>/dev/null; then mongosh --version 2>/dev/null | head -n 1; else echo "mongosh: not installed"; fi
+            if command -v mongosh &>/dev/null; then mongosh --version 2>/dev/null | head -n 1; elif python3 -c "import pymongo" &>/dev/null; then python3 -c "import pymongo; print('pymongo: ' + pymongo.__version__)"; else echo "mongodb backend: pymongo auto-loaded"; fi
             echo "==============================="
             CLEAR_MENU="false"
             ;;

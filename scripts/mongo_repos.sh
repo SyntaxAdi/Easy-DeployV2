@@ -19,6 +19,11 @@ save_repo_to_mongo() {
         return
     fi
 
+    if command -v python3 &>/dev/null; then
+        python3 "$SCRIPT_DIR_MONGO_REPOS/mongo_helper.py" save_repo "$mongo_url" "$repo_name" "$repo_url" "$target_path"
+        return
+    fi
+
     local escaped_repo_name
     local escaped_repo_url
     local escaped_target_path
@@ -54,6 +59,11 @@ update_repo_commands_in_mongo() {
     local apt_cmd="$6"
 
     if [ -z "$mongo_url" ]; then
+        return
+    fi
+
+    if command -v python3 &>/dev/null; then
+        python3 "$SCRIPT_DIR_MONGO_REPOS/mongo_helper.py" update_repo_commands "$mongo_url" "$repo_name" "$venv_cmd" "$install_cmd" "$extra_install_cmd" "$apt_cmd"
         return
     fi
 
@@ -96,6 +106,11 @@ update_repo_env_file_in_mongo() {
         return
     fi
 
+    if command -v python3 &>/dev/null; then
+        python3 "$SCRIPT_DIR_MONGO_REPOS/mongo_helper.py" update_repo_env_file "$mongo_url" "$repo_name" "$env_file" "$env_content"
+        return
+    fi
+
     local escaped_repo_name
     local escaped_env_file
     local escaped_env_content
@@ -103,13 +118,9 @@ update_repo_env_file_in_mongo() {
     escaped_repo_name=$(escape_mongo_str "$repo_name")
     escaped_env_file=$(escape_mongo_str "$env_file")
 
-    if command -v python3 &>/dev/null; then
-        escaped_env_content=$(echo -n "$env_content" | python3 -c 'import json, sys; print(json.dumps(sys.stdin.read()))')
-    else
-        local cleaned
-        cleaned=$(escape_mongo_str "$env_content")
-        escaped_env_content="'$cleaned'"
-    fi
+    local cleaned
+    cleaned=$(escape_mongo_str "$env_content")
+    escaped_env_content="'$cleaned'"
 
     local output
     local exit_code=0
@@ -135,6 +146,11 @@ update_repo_screen_details_in_mongo() {
     local start_cmd="$4"
 
     if [ -z "$mongo_url" ]; then
+        return
+    fi
+
+    if command -v python3 &>/dev/null; then
+        python3 "$SCRIPT_DIR_MONGO_REPOS/mongo_helper.py" update_repo_screen_details "$mongo_url" "$repo_name" "$screen_name" "$start_cmd"
         return
     fi
 
@@ -173,17 +189,17 @@ update_repo_field_in_mongo() {
         return 1
     fi
 
+    if command -v python3 &>/dev/null; then
+        python3 "$SCRIPT_DIR_MONGO_REPOS/mongo_helper.py" update_repo_field "$mongo_url" "$repo_name" "$field_name" "$field_val"
+        return
+    fi
+
     local escaped_repo_name
     escaped_repo_name=$(escape_mongo_str "$repo_name")
 
-    local escaped_val
-    if command -v python3 &>/dev/null; then
-        escaped_val=$(echo -n "$field_val" | python3 -c 'import json, sys; print(json.dumps(sys.stdin.read()))')
-    else
-        local cleaned
-        cleaned=$(escape_mongo_str "$field_val")
-        escaped_val="'$cleaned'"
-    fi
+    local cleaned
+    cleaned=$(escape_mongo_str "$field_val")
+    local escaped_val="'$cleaned'"
 
     local output
     local exit_code=0
@@ -208,6 +224,12 @@ fetch_repos_from_mongo() {
         echo "Error: MongoDB URL is empty." >&2
         return 1
     fi
+
+    if command -v python3 &>/dev/null; then
+        python3 "$SCRIPT_DIR_MONGO_REPOS/mongo_helper.py" fetch_repos "$mongo_url"
+        return
+    fi
+
     local output
     local exit_code=0
     output=$(mongosh "$mongo_url" --quiet --eval "
@@ -232,6 +254,11 @@ fetch_repo_details_from_mongo() {
     local repo_name="$2"
     if [ -z "$mongo_url" ] || [ -z "$repo_name" ]; then
         return 1
+    fi
+
+    if command -v python3 &>/dev/null; then
+        python3 "$SCRIPT_DIR_MONGO_REPOS/mongo_helper.py" fetch_repo_details "$mongo_url" "$repo_name"
+        return
     fi
 
     local escaped_repo_name
@@ -259,6 +286,11 @@ delete_repo_from_mongo() {
     local repo_name="$2"
     if [ -z "$mongo_url" ] || [ -z "$repo_name" ]; then
         return 1
+    fi
+
+    if command -v python3 &>/dev/null; then
+        python3 "$SCRIPT_DIR_MONGO_REPOS/mongo_helper.py" delete_repo "$mongo_url" "$repo_name"
+        return
     fi
 
     local escaped_repo_name

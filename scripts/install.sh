@@ -51,11 +51,21 @@ $SUDO apt install -y jq
 echo "[13/14] Installing fzf..."
 $SUDO apt install -y fzf || true
 
-echo "[14/14] Installing mongosh..."
-if command -v mongosh &>/dev/null; then
-    echo "mongosh already installed"
-else
-    curl -fsSL https://downloads.mongodb.com/compass/mongodb-mongosh_2.9.0_amd64.deb -o /tmp/mongosh.deb
-    $SUDO dpkg -i /tmp/mongosh.deb || $SUDO apt-get install -f -y
-    rm -f /tmp/mongosh.deb
+echo "[14/14] Installing MongoDB backend (pymongo)..."
+if command -v pip3 &>/dev/null; then
+    pip3 install "pymongo[srv]" --break-system-packages 2>/dev/null || pip3 install "pymongo[srv]" 2>/dev/null || true
+elif python3 -m pip --version &>/dev/null; then
+    python3 -m pip install "pymongo[srv]" --break-system-packages 2>/dev/null || python3 -m pip install "pymongo[srv]" 2>/dev/null || true
+fi
+
+ARCH=$(uname -m 2>/dev/null || echo "")
+if [ -z "$PREFIX" ] && [ "$ARCH" = "x86_64" ] && command -v dpkg &>/dev/null; then
+    if ! command -v mongosh &>/dev/null; then
+        echo "Attempting optional mongosh binary install for x86_64..."
+        curl -fsSL https://downloads.mongodb.com/compass/mongodb-mongosh_2.9.0_amd64.deb -o /tmp/mongosh.deb 2>/dev/null || true
+        if [ -f /tmp/mongosh.deb ]; then
+            ($SUDO dpkg -i /tmp/mongosh.deb || $SUDO apt-get install -f -y) 2>/dev/null || true
+            rm -f /tmp/mongosh.deb
+        fi
+    fi
 fi

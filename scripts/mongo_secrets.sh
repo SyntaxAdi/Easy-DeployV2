@@ -14,7 +14,12 @@ fetch_token_from_mongo() {
     if [ -z "$mongo_url" ]; then
         return
     fi
-    local token
+
+    if command -v python3 &>/dev/null; then
+        python3 "$SCRIPT_DIR_MONGO_SECRETS/mongo_helper.py" fetch_token "$mongo_url"
+        return
+    fi
+
     local output
     local exit_code=0
     output=$(mongosh "$mongo_url" --quiet --eval "
@@ -34,6 +39,16 @@ fetch_token_from_mongo() {
 save_token_to_mongo() {
     local mongo_url="$1"
     local token="$2"
+
+    if [ -z "$mongo_url" ]; then
+        return
+    fi
+
+    if command -v python3 &>/dev/null; then
+        python3 "$SCRIPT_DIR_MONGO_SECRETS/mongo_helper.py" save_token "$mongo_url" "$token"
+        return
+    fi
+
     local output
     local exit_code=0
 
