@@ -53,11 +53,11 @@ $PKG_INSTALL nano
 echo "[7/12] Installing ffmpeg..."
 $PKG_INSTALL ffmpeg || true
 
-echo "[8/12] Installing python..."
+echo "[8/12] Installing python & build tools..."
 if [ "$IS_TERMUX" = "true" ]; then
-    $PKG_INSTALL python
+    $PKG_INSTALL python build-essential clang binutils libffi openssl || true
 else
-    $PKG_INSTALL python3
+    $PKG_INSTALL python3 build-essential libffi-dev libssl-dev python3-dev || true
     echo "[8b/12] Installing python3-venv & python3-pip..."
     $PKG_INSTALL python3-venv python3-pip || true
 fi
@@ -65,6 +65,8 @@ fi
 if ! command -v pip3 &>/dev/null && ! python3 -m pip --version &>/dev/null; then
     python3 -m ensurepip --upgrade 2>/dev/null || (curl -fsSL https://bootstrap.pypa.io/get-pip.py -o /tmp/get-pip.py && python3 /tmp/get-pip.py --break-system-packages 2>/dev/null && rm -f /tmp/get-pip.py) || true
 fi
+
+pip3 install --upgrade pip setuptools wheel --break-system-packages 2>/dev/null || pip3 install --upgrade pip setuptools wheel 2>/dev/null || true
 
 echo "[9/12] Installing jq..."
 $PKG_INSTALL jq || true

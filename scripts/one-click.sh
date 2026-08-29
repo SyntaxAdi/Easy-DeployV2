@@ -1,7 +1,5 @@
 #!/bin/bash
 
-set -e
-
 SCRIPT_DIR_OC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR_OC/config.sh"
 source "$SCRIPT_DIR_OC/auth.sh"
@@ -15,32 +13,50 @@ one_click_deploy() {
     load_env
     if [ -z "$MONGODB_URL" ]; then
         echo "Error: MONGODB_URL is not set. Run setup environment first."
+        read -rp "Press Enter to return to main menu..."
         return 1
     fi
 
     echo "Fetching saved repos from MongoDB..."
     local raw_list
     if ! raw_list=$(fetch_repos_from_mongo "$MONGODB_URL"); then
+        read -rp "Press Enter to return to main menu..."
         return 1
     fi
 
     if [ -z "$raw_list" ]; then
         echo "No saved repositories found in MongoDB."
+        read -rp "Press Enter to return to main menu..."
         return 1
     fi
+
+    local menu_list="[Back to Main Menu]
+$raw_list"
 
     echo "Select a repo to deploy:"
     local selected
     if command -v fzf &>/dev/null; then
-        selected=$(echo "$raw_list" | fzf --height 40% --reverse --prompt "Repo> ")
+        selected=$(echo "$menu_list" | fzf --height 40% --reverse --prompt "Repo> ")
     else
-        echo "$raw_list"
-        read -rp "Enter repo line (e.g. repo_name | url): " selected
+        local i=1
+        declare -A repo_map
+        echo "0) [Back to Main Menu]"
+        while IFS= read -r line; do
+            if [ -n "$line" ]; then
+                repo_map[$i]="$line"
+                echo "$i) $line"
+                i=$((i+1))
+            fi
+        done <<< "$raw_list"
+        read -rp "Enter number: " repo_num
+        if [ "$repo_num" = "0" ] || [ -z "$repo_num" ]; then
+            return 0
+        fi
+        selected="${repo_map[$repo_num]}"
     fi
 
-    if [ -z "$selected" ]; then
-        echo "No repo selected."
-        return 1
+    if [ -z "$selected" ] || [ "$selected" = "[Back to Main Menu]" ]; then
+        return 0
     fi
 
     local repo_name
@@ -49,11 +65,13 @@ one_click_deploy() {
     echo "Retrieving details for '$repo_name'..."
     local repo_json
     if ! repo_json=$(fetch_repo_details_from_mongo "$MONGODB_URL" "$repo_name"); then
+        read -rp "Press Enter to return to main menu..."
         return 1
     fi
 
     if [ -z "$repo_json" ]; then
         echo "Error: Repository details not found."
+        read -rp "Press Enter to return to main menu..."
         return 1
     fi
 
@@ -76,7 +94,12 @@ one_click_deploy() {
     echo ""
 
     echo "Step 1: Syncing repository..."
-    git_sync_repo "$repo_url" "$target"
+    if ! git_sync_repo "$repo_url" "$target"; then
+        echo ""
+        echo "Error: Failed to clone or sync repository." >&2
+        read -rp "Press Enter to return to main menu..."
+        return 1
+    fi
 
     if [ -n "$apt_cmd" ] && [ "$apt_cmd" != "null" ]; then
         echo ""
@@ -92,14 +115,25 @@ one_click_deploy() {
         echo ""
         echo "Step 2: Setting up virtual environment..."
         echo "Running: $venv_cmd"
-        (cd "$target" && eval "$venv_cmd")
+        if ! (cd "$target" && eval "$venv_cmd"); then
+            echo ""
+            echo "Error: Virtual environment setup failed." >&2
+            read -rp "Press Enter to return to main menu..."
+            return 1
+        fi
     fi
 
     if [ -n "$install_cmd" ] && [ "$install_cmd" != "null" ]; then
         echo ""
         echo "Step 3: Installing dependencies..."
         echo "Running: $install_cmd"
-        (cd "$target" && eval "$install_cmd")
+        if ! (cd "$target" && eval "$install_cmd"); then
+            echo ""
+            echo "Error: Installing dependencies failed." >&2
+            echo "Tip: If wheel compilation failed, install build tools (e.g. clang, build-essential, libffi, openssl)." >&2
+            read -rp "Press Enter to return to main menu..."
+            return 1
+        fi
     fi
 
     if [ -n "$extra_install_cmd" ] && [ "$extra_install_cmd" != "null" ]; then
@@ -107,10 +141,20 @@ one_click_deploy() {
         echo "Step 4: Installing extra/alternative dependencies..."
         if [ -n "$venv_cmd" ] && [ "$venv_cmd" != "null" ]; then
             echo "Running inside venv: source venv/bin/activate && $extra_install_cmd"
-            (cd "$target" && eval "source venv/bin/activate && $extra_install_cmd")
+            if ! (cd "$target" && eval "source venv/bin/activate && $extra_install_cmd"); then
+                echo ""
+                echo "Error: Extra dependencies installation failed." >&2
+                read -rp "Press Enter to return to main menu..."
+                return 1
+            fi
         else
             echo "Running: $extra_install_cmd"
-            (cd "$target" && eval "$extra_install_cmd")
+            if ! (cd "$target" && eval "$extra_install_cmd"); then
+                echo ""
+                echo "Error: Extra dependencies installation failed." >&2
+                read -rp "Press Enter to return to main menu..."
+                return 1
+            fi
         fi
     fi
 
