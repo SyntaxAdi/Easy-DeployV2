@@ -56,6 +56,9 @@ install_project_dependencies() {
             read -rp "Is this a Python tech stack project? (y/n): " is_python
             if [[ "$is_python" =~ ^[Yy]$ ]]; then
                 local venv_cmd="python3 -m venv venv"
+                if [ -n "$TERMUX_VERSION" ] || [ -d "/data/data/com.termux" ] || [[ "${PREFIX:-}" == *"com.termux"* ]]; then
+                    venv_cmd="python3 -m venv --system-site-packages venv"
+                fi
                 local install_cmd="source venv/bin/activate && pip3 install -r requirements.txt"
                 
                 echo "Creating virtual environment: $venv_cmd..."

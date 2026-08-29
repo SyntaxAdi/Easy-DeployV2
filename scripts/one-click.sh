@@ -114,8 +114,14 @@ $raw_list"
     if [ -n "$venv_cmd" ] && [ "$venv_cmd" != "null" ]; then
         echo ""
         echo "Step 2: Setting up virtual environment..."
-        echo "Running: $venv_cmd"
-        if ! (cd "$target" && eval "$venv_cmd"); then
+        local exec_venv_cmd="$venv_cmd"
+        if [ -n "$TERMUX_VERSION" ] || [ -d "/data/data/com.termux" ] || [[ "${PREFIX:-}" == *"com.termux"* ]]; then
+            if [[ "$exec_venv_cmd" =~ "python3 -m venv" ]] && [[ ! "$exec_venv_cmd" =~ "--system-site-packages" ]]; then
+                exec_venv_cmd="${exec_venv_cmd/python3 -m venv/python3 -m venv --system-site-packages}"
+            fi
+        fi
+        echo "Running: $exec_venv_cmd"
+        if ! (cd "$target" && eval "$exec_venv_cmd"); then
             echo ""
             echo "Error: Virtual environment setup failed." >&2
             read -rp "Press Enter to return to main menu..."

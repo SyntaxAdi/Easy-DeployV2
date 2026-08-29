@@ -53,9 +53,9 @@ $PKG_INSTALL nano
 echo "[7/12] Installing ffmpeg..."
 $PKG_INSTALL ffmpeg || true
 
-echo "[8/12] Installing python & build tools..."
+echo "[8/12] Installing python, build tools & native packages..."
 if [ "$IS_TERMUX" = "true" ]; then
-    $PKG_INSTALL python build-essential clang binutils libffi openssl || true
+    $PKG_INSTALL python build-essential clang binutils libffi openssl python-psutil python-cryptography python-pillow python-lxml python-numpy || true
 else
     $PKG_INSTALL python3 build-essential libffi-dev libssl-dev python3-dev || true
     echo "[8b/12] Installing python3-venv & python3-pip..."
