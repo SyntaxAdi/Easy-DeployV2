@@ -26,8 +26,27 @@ def ensure_pymongo():
                 sys.stderr.write(f"Error: pymongo is required for MongoDB operations on this system. Failed to auto-install: {e}\n")
                 sys.exit(1)
 
+def setup_dns_for_android():
+    try:
+        import dns.resolver
+        res = dns.resolver.Resolver(configure=False)
+        res.nameservers = ['8.8.8.8', '8.8.4.4', '1.1.1.1', '1.0.0.1']
+        dns.resolver.default_resolver = res
+
+        _orig_init = dns.resolver.Resolver.__init__
+        def _safe_init(self, filename=None, configure=True):
+            try:
+                _orig_init(self, filename=filename, configure=configure)
+            except Exception:
+                _orig_init(self, configure=False)
+                self.nameservers = ['8.8.8.8', '8.8.4.4', '1.1.1.1', '1.0.0.1']
+        dns.resolver.Resolver.__init__ = _safe_init
+    except Exception:
+        pass
+
 def get_client(mongo_url):
     pymongo = ensure_pymongo()
+    setup_dns_for_android()
     return pymongo.MongoClient(mongo_url, serverSelectionTimeoutMS=10000)
 
 class MongoEncoder(json.JSONEncoder):

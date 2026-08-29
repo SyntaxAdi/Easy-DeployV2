@@ -14,6 +14,11 @@ fi
 
 PKG_INSTALL="$SUDO apt install -y"
 if [ "$IS_TERMUX" = "true" ]; then
+    mkdir -p "${PREFIX:-/data/data/com.termux/files/usr}/etc"
+    if [ ! -f "${PREFIX:-/data/data/com.termux/files/usr}/etc/resolv.conf" ]; then
+        echo "nameserver 8.8.8.8" > "${PREFIX:-/data/data/com.termux/files/usr}/etc/resolv.conf"
+        echo "nameserver 1.1.1.1" >> "${PREFIX:-/data/data/com.termux/files/usr}/etc/resolv.conf"
+    fi
     if command -v pkg &>/dev/null; then
         PKG_INSTALL="pkg install -y"
     else
