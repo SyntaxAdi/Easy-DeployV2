@@ -24,7 +24,8 @@ show_menu() {
     echo "10) Delete 1-Click Deploy"
     echo "11) Install AntiGravity CLI"
     echo "12) Edit One click deploy"
-    echo "13) Exit"
+    echo "13) Restart One-Click Deploy"
+    echo "14) Exit"
     echo "==============================="
 }
 
@@ -93,6 +94,9 @@ while true; do
             bash scripts/edit-one-click.sh
             ;;
         13)
+            bash scripts/restart-one-click.sh
+            ;;
+        14)
             echo "Bye!"
             exit 0
             ;;
