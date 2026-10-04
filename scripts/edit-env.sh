@@ -349,31 +349,84 @@ ${new_key}=${new_val}"
             echo "3) Delete this variable"
             echo "4) Back"
             read -rp "Choose option: " var_opt
-
+            
             case "$var_opt" in
                 1)
                     read -rp "Enter new value (press Enter to keep current): " new_val
                     new_val="${new_val:-$current_val}"
-                    env_content=$(modify_env_var "$env_content" "$selected_key" "$new_val")
-                    apply_env_updates "$target_path" "$repo_name" "$env_file" "$env_content" "$repo_json"
-                    echo "Value updated."
+                    # Guard: if env_content was somehow truncated, re-fetch from Mongo first
+                    local fresh_check
+                    fresh_check=$(fetch_repo_details_from_mongo "$MONGODB_URL" "$repo_name" 2>/dev/null || echo "")
+                    if [ -n "$fresh_check" ]; then
+                        local fresh_env
+                        fresh_env=$(echo "$fresh_check" | jq -r '.env_content // ""')
+                        # Use fresh if it has more keys than current (prevents blank overwrite)
+                        local fresh_keys cur_keys
+                        fresh_keys=$(printf "%s" "$fresh_env" | grep -c "=" || true)
+                        cur_keys=$(printf "%s" "$env_content" | grep -c "=" || true)
+                        if [ "$fresh_keys" -gt "$cur_keys" ]; then
+                            echo "Refreshing from MongoDB (local copy stale: $cur_keys vs $fresh_keys keys)..."
+                            env_content="$fresh_env"
+                            repo_json="$fresh_check"
+                        fi
+                    fi
+                    local updated_content
+                    updated_content=$(modify_env_var "$env_content" "$selected_key" "$new_val")
+                    # Validate: ensure we didn't lose keys
+                    local before_cnt after_cnt
+                    before_cnt=$(printf "%s" "$env_content" | grep -c "=" || true)
+                    after_cnt=$(printf "%s" "$updated_content" | grep -c "=" || true)
+                    if [ "$after_cnt" -lt "$before_cnt" ]; then
+                        echo "Error: update would delete variables ($before_cnt -> $after_cnt). Aborted." >&2
+                        echo "Debug: before first key=$(printf "%s" "$env_content" | head -n1 | cut -c1-20), after first key=$(printf "%s" "$updated_content" | head -n1 | cut -c1-20)" >&2
+                    else
+                        env_content="$updated_content"
+                        if update_repo_env_file_in_mongo "$MONGODB_URL" "$repo_name" "$env_file" "$env_content"; then
+                            echo "Saved to MongoDB (no restart, no disk write). Value updated."
+                            # refresh local cache from Mongo to stay consistent
+                            repo_json=$(fetch_repo_details_from_mongo "$MONGODB_URL" "$repo_name" 2>/dev/null || echo "$repo_json")
+                            env_content=$(echo "$repo_json" | jq -r '.env_content // ""')
+                        else
+                            echo "Failed to save to MongoDB." >&2
+                        fi
+                    fi
                     break
                     ;;
                 2)
                     read -rp "Enter new name: " new_name
                     if [ -n "$new_name" ]; then
-                        new_name=$(echo "$new_name" | xargs)
-                        env_content=$(rename_env_var "$env_content" "$selected_key" "$new_name")
-                        apply_env_updates "$target_path" "$repo_name" "$env_file" "$env_content" "$repo_json"
-                        selected_key="$new_name"
-                        echo "Name updated to $new_name."
+                        new_name="${new_name#"${new_name%%[![:space:]]*}"}"
+                        new_name="${new_name%"${new_name##*[![:space:]]}"}"
+                        local renamed
+                        renamed=$(rename_env_var "$env_content" "$selected_key" "$new_name")
+                        # validate not losing keys
+                        if [ "$(printf "%s" "$renamed" | grep -c "=" || true)" -lt "$(printf "%s" "$env_content" | grep -c "=" || true)" ]; then
+                            echo "Error: rename would delete variables. Aborted." >&2
+                        else
+                            env_content="$renamed"
+                            if update_repo_env_file_in_mongo "$MONGODB_URL" "$repo_name" "$env_file" "$env_content"; then
+                                echo "Saved to MongoDB. Name updated to $new_name."
+                                repo_json=$(fetch_repo_details_from_mongo "$MONGODB_URL" "$repo_name" 2>/dev/null || echo "$repo_json")
+                                env_content=$(echo "$repo_json" | jq -r '.env_content // ""')
+                                selected_key="$new_name"
+                            else
+                                echo "Failed to save to MongoDB." >&2
+                            fi
+                        fi
                     fi
                     break
                     ;;
                 3)
-                    env_content=$(delete_env_var "$env_content" "$selected_key")
-                    apply_env_updates "$target_path" "$repo_name" "$env_file" "$env_content" "$repo_json"
-                    echo "Variable deleted."
+                    local deleted
+                    deleted=$(delete_env_var "$env_content" "$selected_key")
+                    env_content="$deleted"
+                    if update_repo_env_file_in_mongo "$MONGODB_URL" "$repo_name" "$env_file" "$env_content"; then
+                        echo "Saved to MongoDB. Variable deleted."
+                        repo_json=$(fetch_repo_details_from_mongo "$MONGODB_URL" "$repo_name" 2>/dev/null || echo "$repo_json")
+                        env_content=$(echo "$repo_json" | jq -r '.env_content // ""')
+                    else
+                        echo "Failed to save to MongoDB." >&2
+                    fi
                     break 2
                     ;;
                 4|*)

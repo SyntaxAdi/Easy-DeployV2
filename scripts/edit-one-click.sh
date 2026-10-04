@@ -125,14 +125,15 @@ ${kv_line}"
             fi
             source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/env_modifier.sh"
             local clean
-            clean=$(echo "$current_content" | tr -d '\r')
+            clean=$(printf "%s" "$current_content" | tr -d '\r')
             local keys=()
             declare -A vmap
             while IFS= read -r line || [ -n "$line" ]; do
                 [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue
-                if [[ "$line" =~ = ]]; then
+                if [[ "$line" == *"="* ]]; then
                     local k="${line%%=*}"
-                    k=$(echo "$k" | xargs)
+                    k="${k#"${k%%[![:space:]]*}"}"
+                    k="${k%"${k##*[![:space:]]}"}"
                     keys+=("$k")
                     vmap["$k"]="${line#*=}"
                 fi
@@ -147,8 +148,17 @@ ${kv_line}"
             if [ -z "$sel" ]; then echo "Invalid choice."; return 1; fi
             echo "Current $sel=${vmap[$sel]}"
             read -rp "Enter new value for $sel: " nval
-            nval="${nval:-${vmap[$sel]}}"
-            new_content=$(modify_env_var "$current_content" "$sel" "$nval")
+            # Preserve existing if Enter pressed (allow empty string if user types empty? Use :- fallback)
+            if [ -z "$nval" ] && [ -n "${vmap[$sel]}" ]; then
+                nval="${vmap[$sel]}"
+            fi
+            local tmp_new
+            tmp_new=$(modify_env_var "$current_content" "$sel" "$nval")
+            if [ "$(printf "%s" "$tmp_new" | grep -c "=" || true)" -lt "$(printf "%s" "$current_content" | grep -c "=" || true)" ]; then
+                echo "Error: would delete variables. Aborted." >&2
+                return 1
+            fi
+            new_content="$tmp_new"
             echo "Will update $sel."
             ;;
         7)
@@ -177,11 +187,9 @@ ${kv_line}"
             ;;
     esac
 
+    # MongoDB-only per user request (no disk write, no restart)
     if update_repo_field_in_mongo "$MONGODB_URL" "$repo_name" "env_content" "$new_content"; then
-        echo "Updated environment content in MongoDB."
-        if [ -n "$target_path" ] && [ -d "$target_path" ] && [ -n "$env_file" ]; then
-            write_env_file_direct "$target_path" "$env_file" "$new_content"
-        fi
+        echo "Updated environment content in MongoDB (no disk write, no restart)."
         return 0
     else
         echo "Failed to update environment content in MongoDB." >&2

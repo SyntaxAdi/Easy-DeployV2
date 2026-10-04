@@ -11,7 +11,8 @@ modify_env_var() {
     local new_val="$3"
     
     local clean_content
-    clean_content=$(echo "$content" | tr -d '\r')
+    # Use printf to preserve trailing newlines and avoid echo mangling of $ etc
+    clean_content=$(printf "%s" "$content" | tr -d '\r')
     
     local new_content=""
     while IFS= read -r line || [ -n "$line" ]; do
@@ -25,11 +26,15 @@ ${line}"
             continue
         fi
 
-        if [[ "$line" =~ = ]]; then
+        if [[ "$line" == *"="* ]]; then
             local key="${line%%=*}"
-            key=$(echo "$key" | xargs)
+            # trim whitespace without using xargs subshell that eats $ etc
+            key="${key#"${key%%[![:space:]]*}"}"
+            key="${key%"${key##*[![:space:]]}"}"
             if [ "$key" = "$target_key" ]; then
-                local updated_line="${target_key}=${new_val}"
+                # Build updated line without word splitting; new_val may contain = $ etc
+                local updated_line
+                printf -v updated_line "%s=%s" "$target_key" "$new_val"
                 if [ -z "$new_content" ]; then
                     new_content="$updated_line"
                 else
@@ -53,7 +58,7 @@ ${line}"
             fi
         fi
     done <<< "$clean_content"
-    echo -n "$new_content"
+    printf "%s" "$new_content"
 }
 
 rename_env_var() {
@@ -62,7 +67,7 @@ rename_env_var() {
     local new_key="$3"
     
     local clean_content
-    clean_content=$(echo "$content" | tr -d '\r')
+    clean_content=$(printf "%s" "$content" | tr -d '\r')
     
     local new_content=""
     while IFS= read -r line || [ -n "$line" ]; do
@@ -76,12 +81,14 @@ ${line}"
             continue
         fi
 
-        if [[ "$line" =~ = ]]; then
+        if [[ "$line" == *"="* ]]; then
             local key="${line%%=*}"
             local val="${line#*=}"
-            key=$(echo "$key" | xargs)
+            key="${key#"${key%%[![:space:]]*}"}"
+            key="${key%"${key##*[![:space:]]}"}"
             if [ "$key" = "$old_key" ]; then
-                local updated_line="${new_key}=${val}"
+                local updated_line
+                printf -v updated_line "%s=%s" "$new_key" "$val"
                 if [ -z "$new_content" ]; then
                     new_content="$updated_line"
                 else
@@ -105,7 +112,7 @@ ${line}"
             fi
         fi
     done <<< "$clean_content"
-    echo -n "$new_content"
+    printf "%s" "$new_content"
 }
 
 delete_env_var() {
@@ -113,7 +120,7 @@ delete_env_var() {
     local target_key="$2"
     
     local clean_content
-    clean_content=$(echo "$content" | tr -d '\r')
+    clean_content=$(printf "%s" "$content" | tr -d '\r')
     
     local new_content=""
     while IFS= read -r line || [ -n "$line" ]; do
@@ -127,9 +134,10 @@ ${line}"
             continue
         fi
 
-        if [[ "$line" =~ = ]]; then
+        if [[ "$line" == *"="* ]]; then
             local key="${line%%=*}"
-            key=$(echo "$key" | xargs)
+            key="${key#"${key%%[![:space:]]*}"}"
+            key="${key%"${key##*[![:space:]]}"}"
             if [ "$key" = "$target_key" ]; then
                 continue
             else
@@ -149,5 +157,5 @@ ${line}"
             fi
         fi
     done <<< "$clean_content"
-    echo -n "$new_content"
+    printf "%s" "$new_content"
 }
