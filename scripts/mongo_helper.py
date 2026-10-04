@@ -162,6 +162,29 @@ def cmd_delete_repo(mongo_url, repo_name):
     db = client.get_database("deploy")
     db.repos.delete_one({"repo_name": repo_name})
 
+def cmd_search_by_env(mongo_url, query):
+    query = (query or "").strip().replace("\r", "")
+    if not query:
+        print("[]")
+        return
+    client = get_client(mongo_url)
+    db = client.get_database("deploy")
+    docs = db.repos.find({}, {"repo_name": 1, "repo_url": 1, "env_content": 1, "env_file": 1, "target_path": 1, "screen_name": 1})
+    hits = []
+    for d in docs:
+        c = d.get("env_content") or ""
+        if query in c:
+            lines = [l for l in c.splitlines() if query in l]
+            hits.append({
+                "repo_name": d.get("repo_name"),
+                "repo_url": d.get("repo_url"),
+                "env_file": d.get("env_file"),
+                "target_path": d.get("target_path"),
+                "screen_name": d.get("screen_name"),
+                "matched_lines": lines
+            })
+    print(json.dumps(hits, cls=MongoEncoder))
+
 def main():
     if len(sys.argv) < 3:
         sys.stderr.write("Usage: mongo_helper.py <command> <mongo_url> [args...]\n")
@@ -218,6 +241,9 @@ def main():
         elif cmd == "delete_repo":
             repo_name = sys.argv[3]
             cmd_delete_repo(mongo_url, repo_name)
+        elif cmd == "search_by_env":
+            q = sys.argv[3] if len(sys.argv) > 3 else sys.stdin.read()
+            cmd_search_by_env(mongo_url, q)
         else:
             sys.stderr.write(f"Unknown command: {cmd}\n")
             sys.exit(1)

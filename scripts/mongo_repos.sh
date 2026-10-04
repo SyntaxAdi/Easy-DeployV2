@@ -308,3 +308,21 @@ delete_repo_from_mongo() {
         return 1
     fi
 }
+search_repos_by_env() {
+    local mongo_url="$1"
+    local query="$2"
+    if [ -z "$mongo_url" ]; then
+        echo "Error: MongoDB URL is empty." >&2
+        return 1
+    fi
+    if [ -z "$query" ]; then
+        echo "[]"
+        return 0
+    fi
+    if command -v python3 &>/dev/null; then
+        python3 "$SCRIPT_DIR_MONGO_REPOS/mongo_helper.py" search_by_env "$mongo_url" "$query"
+        return
+    fi
+    echo "[]"
+}
+

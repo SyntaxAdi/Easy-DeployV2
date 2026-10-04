@@ -25,7 +25,8 @@ show_menu() {
     echo "11) Install AntiGravity CLI"
     echo "12) Edit One click deploy"
     echo "13) Restart One-Click Deploy"
-    echo "14) Exit"
+    echo "14) Search by ENV"
+    echo "15) Exit"
     echo "==============================="
 }
 
@@ -97,6 +98,9 @@ while true; do
             bash scripts/restart-one-click.sh
             ;;
         14)
+            bash scripts/search-by-env.sh
+            ;;
+        15)
             echo "Bye!"
             exit 0
             ;;
