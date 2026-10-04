@@ -39,12 +39,24 @@ edit_repo_env_content() {
     local current_content="$4"
 
     echo ""
+    # Diagnostics for corrupted/empty content
+    if [ -z "$current_content" ] || [ "$current_content" = "null" ] || ! echo "$current_content" | grep -q "="; then
+        if [ -n "$current_content" ] && [ "$current_content" != "null" ] && ! echo "$current_content" | grep -q "="; then
+            echo "Warning: stored env_content looks corrupted (len=$(echo -n "$current_content" | wc -c | xargs), preview='$(echo -n "$current_content" | head -c 40 | cat -A)') - no KEY=VALUE found."
+        fi
+        echo "Note: config.env is GLOBAL config only. Per-bot env is MongoDB env_content + $target_path/$env_file."
+        if [ -n "$target_path" ] && [ -f "$target_path/$env_file" ]; then
+            echo "Disk file found at $target_path/$env_file ($(wc -c < "$target_path/$env_file" | xargs) bytes) - will sync on save."
+        fi
+    fi
     echo "=== Environment Content Options ==="
     echo "1) View current env content"
     echo "2) Replace with new multiline paste (finish with 'EOF' or Ctrl+D)"
     echo "3) Append variable (KEY=VALUE)"
     echo "4) Clear env content"
     echo "5) Cancel"
+    echo "6) Edit single variable (fix corrupted value without re-pasting all)"
+    echo "7) Import from another bot"
     read -rp "Choose option: " env_opt
 
     local new_content="$current_content"
@@ -103,6 +115,61 @@ ${kv_line}"
             ;;
         5)
             return 0
+            ;;
+        6)
+            # Edit single variable in place
+            if [ -z "$current_content" ] || ! echo "$current_content" | grep -q "="; then
+                echo "No valid env to edit. Use option 2 to paste fresh content first."
+                read -rp "Press Enter to continue..."
+                return 1
+            fi
+            source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/env_modifier.sh"
+            local clean
+            clean=$(echo "$current_content" | tr -d '\r')
+            local keys=()
+            declare -A vmap
+            while IFS= read -r line || [ -n "$line" ]; do
+                [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue
+                if [[ "$line" =~ = ]]; then
+                    local k="${line%%=*}"
+                    k=$(echo "$k" | xargs)
+                    keys+=("$k")
+                    vmap["$k"]="${line#*=}"
+                fi
+            done <<< "$clean"
+            echo "Select variable to update value:"
+            local i=1; declare -A kmap
+            for k in "${keys[@]}"; do echo "  $i) $k=${vmap[$k]}"; kmap[$i]="$k"; i=$((i+1)); done
+            echo "  $i) Cancel"
+            read -rp "Enter number: " vc
+            if [ -z "$vc" ] || [ "$vc" -eq "$i" ] 2>/dev/null; then return 0; fi
+            local sel="${kmap[$vc]}"
+            if [ -z "$sel" ]; then echo "Invalid choice."; return 1; fi
+            echo "Current $sel=${vmap[$sel]}"
+            read -rp "Enter new value for $sel: " nval
+            nval="${nval:-${vmap[$sel]}}"
+            new_content=$(modify_env_var "$current_content" "$sel" "$nval")
+            echo "Will update $sel."
+            ;;
+        7)
+            echo "Import env from another bot..."
+            local sib_list
+            sib_list=$(fetch_repos_from_mongo "$MONGODB_URL" 2>/dev/null | grep -v "^${repo_name} |" || true)
+            local si=1; declare -A smap
+            while IFS= read -r sline; do
+                [ -z "$sline" ] && continue
+                local sname=$(echo "$sline" | awk -F '|' '{print $1}' | xargs)
+                local sj=$(fetch_repo_details_from_mongo "$MONGODB_URL" "$sname" 2>/dev/null || echo "")
+                local slen=$(echo "$sj" | jq -r '.env_content // "" | length' 2>/dev/null || echo 0)
+                if [ "$slen" -gt 10 ]; then echo "  $si) $sname (${slen} chars)"; smap[$si]="$sname"; si=$((si+1)); fi
+            done <<< "$sib_list"
+            if [ ${#smap[@]} -eq 0 ]; then echo "No source with valid env."; return 1; fi
+            read -rp "Enter number to import: " sc
+            if [ -z "$sc" ] || [ -z "${smap[$sc]:-}" ]; then echo "Cancelled."; return 0; fi
+            local src="${smap[$sc]}"
+            local src_json=$(fetch_repo_details_from_mongo "$MONGODB_URL" "$src" 2>/dev/null)
+            new_content=$(echo "$src_json" | jq -r '.env_content // ""')
+            echo "Imported from $src ($(echo "$new_content" | grep -c "=") vars). Review with option 1 after save."
             ;;
         *)
             echo "Invalid option."

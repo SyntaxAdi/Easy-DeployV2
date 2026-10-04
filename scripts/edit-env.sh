@@ -103,25 +103,180 @@ $raw_list"
         done <<< "$clean_content"
 
         if [ ${#keys[@]} -eq 0 ]; then
-            echo "No environment variables found in $env_file."
-            read -rp "Would you like to add a new variable? (y/n): " add_new
-            if [[ "$add_new" =~ ^[Yy]$ ]]; then
-                read -rp "Enter Variable Name: " new_key
-                read -rp "Enter Variable Value: " new_val
-                if [ -n "$new_key" ]; then
-                    new_key=$(echo "$new_key" | xargs)
-                    if [ -z "$env_content" ]; then
-                        env_content="${new_key}=${new_val}"
-                    else
-                        env_content="${env_content}
-${new_key}=${new_val}"
-                    fi
-                    apply_env_updates "$target_path" "$repo_name" "$env_file" "$env_content" "$repo_json"
-                    echo "Variable added."
+            # --- Enhanced diagnostics + recovery for empty/corrupted env ---
+            echo ""
+            echo "No environment variables found in MongoDB for '$repo_name' ($env_file)."
+            local _gc_len
+            _gc_len=$(echo -n "$env_content" | wc -c | xargs)
+            local _gc_preview
+            _gc_preview=$(echo -n "$env_content" | head -c 60 | cat -A | head -n 1)
+            if [ -z "$env_content" ] || [ "$env_content" = "null" ]; then
+                echo "  Mongo env_content: <empty>"
+            else
+                echo "  Mongo env_content: len=${_gc_len} preview='${_gc_preview}' (may be corrupted)"
+                if ! echo "$env_content" | grep -q "="; then
+                    echo "  Warning: content contains no '=' -> treated as corrupted/empty."
+                fi
+            fi
+            echo "  Target path: ${target_path:-<not set>}"
+            local _disk_info=""
+            local _disk_exists=0
+            local _disk_lines=0
+            if [ -n "$target_path" ] && [ -f "$target_path/$env_file" ]; then
+                _disk_exists=1
+                _disk_lines=$(wc -l < "$target_path/$env_file" 2>/dev/null | xargs)
+                local _disk_size
+                _disk_size=$(wc -c < "$target_path/$env_file" 2>/dev/null | xargs)
+                _disk_info="exists (${_disk_lines} lines, ${_disk_size} bytes)"
+                if [ -r "$target_path/$env_file" ]; then
+                    echo "  Disk file: $target_path/$env_file -> $_disk_info [readable]"
+                else
+                    echo "  Disk file: $target_path/$env_file -> $_disk_info [not readable - permission denied]"
                 fi
             else
-                break
+                echo "  Disk file: ${target_path:-?}/$env_file -> not found"
             fi
+            echo "  Note: config.env is GLOBAL (MONGODB_URL/GITHUB_TOKEN) and not per-bot. Per-bot env is stored in MongoDB env_content."
+            echo ""
+            echo "Recovery options:"
+            echo "  1) Add single variable (KEY=VALUE)"
+            echo "  2) Paste entire env file (multiline, end with EOF or Ctrl+D)"
+            echo "  3) Import from another bot's env"
+            echo "  4) Import from disk file ($env_file) if exists"
+            echo "  5) Clear corrupted content (reset to empty)"
+            echo "  6) Back to repo selection"
+            read -rp "Choose option [1-6]: " empty_opt
+            case "$empty_opt" in
+                1)
+                    read -rp "Enter Variable Name: " new_key
+                    read -rp "Enter Variable Value: " new_val
+                    if [ -n "$new_key" ]; then
+                        new_key=$(echo "$new_key" | xargs)
+                        # if current content is garbage without '=', replace instead of append
+                        if [ -z "$env_content" ] || [ "$env_content" = "null" ] || ! echo "$env_content" | grep -q "="; then
+                            env_content="${new_key}=${new_val}"
+                        else
+                            env_content="${env_content}
+${new_key}=${new_val}"
+                        fi
+                        apply_env_updates "$target_path" "$repo_name" "$env_file" "$env_content" "$repo_json"
+                        # refresh repo_json after update for next loop
+                        repo_json=$(fetch_repo_details_from_mongo "$MONGODB_URL" "$repo_name" 2>/dev/null || echo "$repo_json")
+                        env_content=$(echo "$repo_json" | jq -r '.env_content // ""')
+                        echo "Variable added."
+                    fi
+                    ;;
+                2)
+                    echo "Paste your env file content below (type 'EOF' on a new line or press Ctrl+D to finish):"
+                    local pasted=""
+                    while IFS= read -r line || [ -n "$line" ]; do
+                        if [ "$line" = "EOF" ]; then
+                            break
+                        fi
+                        if [ -z "$pasted" ]; then
+                            pasted="$line"
+                        else
+                            pasted="${pasted}
+${line}"
+                        fi
+                    done
+                    if [ -z "$pasted" ]; then
+                        echo "No content pasted. Cancelled."
+                    elif ! echo "$pasted" | grep -q "="; then
+                        echo "Invalid content: must contain at least one 'KEY=VALUE' line."
+                    else
+                        env_content="$pasted"
+                        apply_env_updates "$target_path" "$repo_name" "$env_file" "$env_content" "$repo_json"
+                        repo_json=$(fetch_repo_details_from_mongo "$MONGODB_URL" "$repo_name" 2>/dev/null || echo "$repo_json")
+                        env_content=$(echo "$repo_json" | jq -r '.env_content // ""')
+                        echo "Environment content replaced from paste."
+                    fi
+                    ;;
+                3)
+                    echo "Fetching other deployments..."
+                    local sibling_list
+                    sibling_list=$(fetch_repos_from_mongo "$MONGODB_URL" 2>/dev/null | grep -v "^${repo_name} |" || true)
+                    if [ -z "$sibling_list" ]; then
+                        echo "No other deployments found."
+                    else
+                        echo "Available sources:"
+                        local si=1
+                        declare -A sib_map
+                        while IFS= read -r sline; do
+                            [ -z "$sline" ] && continue
+                            local sname
+                            sname=$(echo "$sline" | awk -F '|' '{print $1}' | xargs)
+                            # check that source has env
+                            local sjson
+                            sjson=$(fetch_repo_details_from_mongo "$MONGODB_URL" "$sname" 2>/dev/null || echo "")
+                            local slen
+                            slen=$(echo "$sjson" | jq -r '.env_content // "" | length' 2>/dev/null || echo 0)
+                            if [ "$slen" -gt 10 ]; then
+                                echo "  $si) $sname (${slen} chars)"
+                                sib_map[$si]="$sname"
+                                si=$((si+1))
+                            fi
+                        done <<< "$sibling_list"
+                        if [ ${#sib_map[@]} -eq 0 ]; then
+                            echo "No sibling with valid env found."
+                        else
+                            read -rp "Enter number to import from (or Enter to cancel): " sib_choice
+                            if [ -n "$sib_choice" ] && [ -n "${sib_map[$sib_choice]:-}" ]; then
+                                local src="${sib_map[$sib_choice]}"
+                                local src_json
+                                src_json=$(fetch_repo_details_from_mongo "$MONGODB_URL" "$src" 2>/dev/null)
+                                local src_content
+                                src_content=$(echo "$src_json" | jq -r '.env_content // ""')
+                                echo "Preview keys from $src: $(echo "$src_content" | cut -d= -f1 | tr '\n' ',' | cut -c1-80)"
+                                read -rp "Import this env to $repo_name? You will edit values after. (y/n): " conf
+                                if [[ "$conf" =~ ^[Yy]$ ]]; then
+                                    env_content="$src_content"
+                                    apply_env_updates "$target_path" "$repo_name" "$env_file" "$env_content" "$repo_json"
+                                    repo_json=$(fetch_repo_details_from_mongo "$MONGODB_URL" "$repo_name" 2>/dev/null || echo "$repo_json")
+                                    env_content=$(echo "$repo_json" | jq -r '.env_content // ""')
+                                    echo "Imported from $src. Now edit values as needed."
+                                fi
+                            fi
+                        fi
+                    fi
+                    ;;
+                4)
+                    if [ "$_disk_exists" -eq 1 ] && [ -r "$target_path/$env_file" ]; then
+                        local disk_content
+                        disk_content=$(cat "$target_path/$env_file" 2>/dev/null || echo "")
+                        if [ -z "$disk_content" ]; then
+                            echo "Disk file is empty."
+                        elif ! echo "$disk_content" | grep -q "="; then
+                            echo "Disk file has no KEY=VALUE lines."
+                        else
+                            echo "Disk preview: $(head -n 3 "$target_path/$env_file" 2>/dev/null | cut -d= -f1 | tr '\n' ',' | cut -c1-80)"
+                            read -rp "Overwrite MongoDB env with disk file? (y/n): " conf2
+                            if [[ "$conf2" =~ ^[Yy]$ ]]; then
+                                env_content="$disk_content"
+                                apply_env_updates "$target_path" "$repo_name" "$env_file" "$env_content" "$repo_json"
+                                repo_json=$(fetch_repo_details_from_mongo "$MONGODB_URL" "$repo_name" 2>/dev/null || echo "$repo_json")
+                                env_content=$(echo "$repo_json" | jq -r '.env_content // ""')
+                                echo "Synced from disk to MongoDB."
+                            fi
+                        fi
+                    else
+                        echo "No readable disk file to import. Use option 2 to paste instead."
+                    fi
+                    ;;
+                5)
+                    read -rp "Clear corrupted content in MongoDB? (y/n): " conf_clear
+                    if [[ "$conf_clear" =~ ^[Yy]$ ]]; then
+                        env_content=""
+                        apply_env_updates "$target_path" "$repo_name" "$env_file" "$env_content" "$repo_json"
+                        repo_json=$(fetch_repo_details_from_mongo "$MONGODB_URL" "$repo_name" 2>/dev/null || echo "$repo_json")
+                        env_content=$(echo "$repo_json" | jq -r '.env_content // ""')
+                        echo "Cleared. You can now add variables fresh."
+                    fi
+                    ;;
+                6|*)
+                    break
+                    ;;
+            esac
             continue
         fi
 
